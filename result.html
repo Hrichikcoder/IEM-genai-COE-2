@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quiz Results · Logging &amp; Monitoring Agent Decisions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script>
+  /* Applied before paint to avoid a flash of the wrong theme */
+  (function(){
+    try{
+      var t = localStorage.getItem('theme');
+      if(!t){ t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
+      document.documentElement.setAttribute('data-theme', t);
+    }catch(e){ document.documentElement.setAttribute('data-theme', 'light'); }
+  })();
+</script>
+<style>
+  :root{
+    --ink:#1a1815;
+    --paper:#ffffff;
+    --paper-dim:#e7ddc4;
+    --surface-alt:#fffdf8;
+    --surface-solid:#ffffff;
+    --line:#d4c7a8;
+    --border-hover:#a9976e;
+    --muted:#6b6255;
+    --hover-bg:#f1e8d2;
+    --shadow-1: rgba(30,22,10,0.07);
+    --shadow-2: rgba(30,22,10,0.18);
+    --ring-track:#ddd0ab;
+    --btn-bg:#1a1815;
+    --btn-text:#fffdf8;
+    --btn-hover:#33302a;
+    --gan:#b85c50;
+    --vae:#5c7f57;
+    --diffusion:#b9822e;
+    --autoregressive:#5a6f99;
+    --bg-dot: rgba(30,22,10,0.08);
+  }
+  [data-theme="dark"]{
+    --ink:#f7f5f0;
+    --paper:#1c1f26;
+    --paper-dim:#14161a;
+    --surface-alt:#262a33;
+    --surface-solid:#2a2e37;
+    --line:#3a3d45;
+    --border-hover:#565962;
+    --muted:#9a9791;
+    --hover-bg:#2b2e37;
+    --shadow-1: rgba(0,0,0,0.3);
+    --shadow-2: rgba(0,0,0,0.45);
+    --ring-track:#3a3d45;
+    --btn-bg:#f7f5f0;
+    --btn-text:#14161a;
+    --btn-hover:#e2ded2;
+    --gan:#d97e6e;
+    --vae:#7fae78;
+    --diffusion:#d9a256;
+    --autoregressive:#7c93c2;
+    --bg-dot: rgba(255,255,255,0.045);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    min-height:100vh;
+    background-color:var(--paper-dim);
+    background-image:radial-gradient(circle at 1px 1px, var(--bg-dot) 1.4px, transparent 0);
+    background-size:26px 26px;
+    font-family:'IBM Plex Sans', sans-serif;
+    color:var(--ink);
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    padding:36px 20px;
+    transition:background-color 0.2s ease, color 0.2s ease;
+  }
+  .theme-toggle{
+    position:fixed;
+    top:24px;
+    right:24px;
+    width:40px;
+    height:40px;
+    border-radius:50%;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    transition:border-color 0.15s ease, background 0.15s ease;
+  }
+  .theme-toggle:hover{ border-color:var(--border-hover); }
+  .theme-toggle svg{ width:18px; height:18px; }
+  .card{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:44px 38px;
+    max-width:460px;
+    width:100%;
+    box-shadow:0 1px 2px var(--shadow-1), 0 12px 30px var(--shadow-2);
+    text-align:center;
+    transition:background 0.2s ease, max-width 0.2s ease;
+  }
+  .eyebrow{ font-size:0.85rem; color:var(--muted); margin:0 0 6px 0; }
+  h1{
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    font-size:1.5rem;
+    margin:0 0 6px 0;
+  }
+  .completed-date{ font-size:0.78rem; color:var(--muted); margin:0 0 24px 0; }
+
+  /* ---------- score ring ---------- */
+  .score-ring-wrap{
+    position:relative;
+    width:168px;
+    height:168px;
+    margin:0 auto 10px;
+  }
+  .score-ring{ width:100%; height:100%; transform:rotate(-90deg); }
+  .score-ring circle{ fill:none; stroke-width:12; }
+  .ring-track{ stroke:var(--ring-track); }
+  .ring-fill{
+    stroke:var(--ink);
+    stroke-linecap:round;
+    transition:stroke-dashoffset 0.9s cubic-bezier(.4,0,.2,1), stroke 0.3s ease;
+  }
+  .score-ring-center{
+    position:absolute;
+    inset:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+  }
+  .score-num{
+    font-family:'Fraunces', serif;
+    font-weight:700;
+    font-size:1.9rem;
+    line-height:1;
+  }
+  .score-pct{ font-size:0.78rem; color:var(--muted); margin-top:4px; }
+  .score-sub{ font-size:0.92rem; color:var(--ink); margin:0; line-height:1.5; }
+
+  .results-top{ margin-bottom:30px; }
+  .results-side{ margin-bottom:0; }
+
+  .breakdown{ text-align:left; margin-bottom:14px; }
+  .break-row{ margin-bottom:14px; }
+  .break-label{
+    display:flex;
+    justify-content:space-between;
+    font-size:0.85rem;
+    margin-bottom:6px;
+  }
+  .break-label .name{ display:flex; align-items:center; gap:7px; }
+  .break-dot{ width:8px; height:8px; border-radius:50%; flex:none; }
+  .dot-gan{ background:var(--gan); }
+  .dot-vae{ background:var(--vae); }
+  .dot-diffusion{ background:var(--diffusion); }
+  .dot-autoregressive{ background:var(--autoregressive); }
+  .break-track{
+    height:6px;
+    background:var(--ring-track);
+    border-radius:4px;
+    overflow:hidden;
+  }
+  .break-fill{
+    height:100%;
+    border-radius:4px;
+    width:0%;
+    transition:width 0.7s cubic-bezier(.4,0,.2,1);
+  }
+  .fill-gan{ background:var(--gan); }
+  .fill-vae{ background:var(--vae); }
+  .fill-diffusion{ background:var(--diffusion); }
+  .fill-autoregressive{ background:var(--autoregressive); }
+
+  .callout{
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    font-size:0.78rem;
+    color:var(--muted);
+    padding:10px 12px;
+    border:1px solid var(--line);
+    border-radius:10px;
+    margin-bottom:28px;
+    text-align:left;
+  }
+  .callout span.hl{ color:var(--ink); font-weight:500; }
+
+  #empty-view{ max-width:340px; margin:0 auto; }
+  .empty-icon{
+    width:48px; height:48px;
+    margin:4px auto 20px;
+    color:var(--muted);
+  }
+  .empty-text{ font-size:0.92rem; color:var(--muted); margin:0 0 30px 0; line-height:1.55; }
+
+  .actions{ display:flex; flex-direction:column; gap:12px; }
+  .btn{
+    display:block;
+    padding:14px 20px;
+    border-radius:10px;
+    border:1px solid var(--btn-bg);
+    background:var(--btn-bg);
+    color:var(--btn-text);
+    font-family:inherit;
+    font-size:0.95rem;
+    font-weight:500;
+    cursor:pointer;
+    text-align:center;
+    text-decoration:none;
+  }
+  .btn:hover{ background:var(--btn-hover); border-color:var(--btn-hover); }
+  .btn-secondary{
+    background:var(--paper);
+    color:var(--ink);
+    border:1px solid var(--line);
+  }
+  .btn-secondary:hover{ background:var(--hover-bg); border-color:var(--border-hover); }
+  a.link{
+    color:var(--muted);
+    font-size:0.88rem;
+    text-decoration:none;
+  }
+  a.link:hover{ color:var(--ink); }
+
+  .btn:focus-visible,
+  a.link:focus-visible,
+  .theme-toggle:focus-visible{
+    outline:2px solid var(--ink);
+    outline-offset:3px;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .ring-fill, .break-fill{ transition:none; }
+  }
+
+  [hidden]{ display:none !important; }
+
+  /* ---------- PDF export card (off-screen, forced light palette) ---------- */
+  .export-card{
+    --ink:#1a1815; --paper:#ffffff; --muted:#6b6255; --line:#d4c7a8; --ring-track:#ddd0ab;
+    --gan:#b85c50; --vae:#5c7f57; --diffusion:#b9822e; --autoregressive:#5a6f99;
+    --good:#4c7a4f;
+    position:fixed;
+    top:0;
+    left:-10000px;
+    width:680px;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'IBM Plex Sans', sans-serif;
+    padding:52px 56px 44px;
+    box-sizing:border-box;
+  }
+  .export-topline{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:34px; }
+  .export-brand{ font-size:0.8rem; letter-spacing:0.04em; text-transform:uppercase; color:var(--muted); font-weight:600; }
+  .export-date{ font-size:0.8rem; color:var(--muted); }
+  .export-title{ font-family:'Fraunces', serif; font-weight:700; font-size:2rem; margin:0 0 6px 0; }
+  .export-headline{ font-size:0.98rem; color:var(--ink); margin:0 0 36px 0; line-height:1.5; max-width:520px; }
+  .export-main{ display:flex; gap:48px; align-items:center; margin-bottom:38px; }
+  .export-ring-wrap{ position:relative; width:190px; height:190px; flex:none; }
+  .export-ring{ width:100%; height:100%; transform:rotate(-90deg); }
+  .export-ring circle{ fill:none; stroke-width:13; }
+  .export-ring-track{ stroke:var(--ring-track); }
+  .export-ring-fill{ stroke-linecap:round; }
+  .export-ring-center{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .export-score-num{ font-family:'Fraunces', serif; font-weight:700; font-size:2.15rem; line-height:1; }
+  .export-score-pct{ font-size:0.85rem; color:var(--muted); margin-top:5px; }
+  .export-side{ flex:1; }
+  .export-side-label{ font-size:0.78rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; margin:0 0 14px 0; font-weight:600; }
+  .export-break-row{ margin-bottom:16px; }
+  .export-break-row:last-child{ margin-bottom:0; }
+  .export-break-label{ display:flex; justify-content:space-between; font-size:0.88rem; margin-bottom:7px; }
+  .export-break-label .name{ display:flex; align-items:center; gap:8px; font-weight:500; }
+  .export-dot{ width:9px; height:9px; border-radius:50%; flex:none; }
+  .export-break-track{ height:8px; background:var(--ring-track); border-radius:5px; overflow:hidden; }
+  .export-break-fill{ height:100%; border-radius:5px; }
+  .export-callout{ display:flex; justify-content:space-between; gap:16px; font-size:0.85rem; color:var(--muted); padding:14px 18px; border:1px solid var(--line); border-radius:12px; margin-bottom:0; }
+  .export-callout .hl{ color:var(--ink); font-weight:600; }
+  .export-footer{ margin-top:40px; padding-top:18px; border-top:1px solid var(--line); font-size:0.75rem; color:var(--muted); display:flex; justify-content:space-between; }
+
+  /* ---------- wider viewports ---------- */
+  @media (min-width:640px){
+    .card{ max-width:520px; padding:48px 46px; }
+  }
+
+  @media (min-width:900px){
+    .card{ max-width:760px; padding:56px 64px; }
+    .score-ring-wrap{ width:190px; height:190px; }
+    h1{ font-size:1.7rem; }
+
+    #results-view{
+      display:grid;
+      grid-template-columns:220px 1fr;
+      grid-template-areas:
+        "top side"
+        "actions actions";
+      column-gap:48px;
+      row-gap:34px;
+      align-items:start;
+    }
+    .results-top{ grid-area:top; margin-bottom:0; }
+    .results-side{ grid-area:side; align-self:start; padding-top:6px; }
+    .actions{
+      grid-area:actions;
+      flex-direction:row;
+      justify-content:center;
+      gap:16px;
+    }
+    .actions .btn{ width:auto; padding-left:32px; padding-right:32px; }
+    .actions a.link{ align-self:center; }
+  }
+</style>
+</head>
+<body>
+  <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Toggle theme"></button>
+  <div class="card">
+    <p class="eyebrow">Logging &amp; Monitoring Agent Decisions</p>
+
+    <!-- shown once a completed quiz is found in this browser -->
+    <div id="results-view" hidden>
+      <div class="results-top">
+        <h1>Quiz results</h1>
+        <p class="completed-date" id="completed-date"></p>
+
+        <div class="score-ring-wrap" role="img" aria-label="Score progress ring">
+          <svg class="score-ring" viewBox="0 0 168 168">
+            <circle class="ring-track" cx="84" cy="84" r="74"></circle>
+            <circle class="ring-fill" id="ring-fill" cx="84" cy="84" r="74"></circle>
+          </svg>
+          <div class="score-ring-center">
+            <span class="score-num" id="score-display">0/0</span>
+            <span class="score-pct" id="score-pct">0%</span>
+          </div>
+        </div>
+        <p class="score-sub" id="score-sub"></p>
+      </div>
+
+      <div class="results-side">
+        <div class="breakdown" id="breakdown"></div>
+        <div class="callout" id="callout" hidden></div>
+      </div>
+
+      <div class="actions">
+        <a class="btn" href="quiz.html">Retake quiz</a>
+        <button class="btn btn-secondary" id="download-btn" onclick="downloadResults()">Download scorecard (PDF)</button>
+        <a class="link" href="index.html">Return to home</a>
+      </div>
+    </div>
+
+    <!-- shown when the page is opened without a completed attempt on record -->
+    <div id="empty-view" hidden>
+      <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="9"></circle>
+        <path d="M9 10h.01M15 10h.01M8.5 15.5a4 4 0 0 1 7 0"></path>
+      </svg>
+      <h1>No results yet</h1>
+      <p class="empty-text">Take the quiz to see your score and a breakdown by architecture here.</p>
+      <div class="actions">
+        <a class="btn" href="quiz.html">Take the quiz</a>
+        <a class="link" href="index.html">Return to home</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- off-screen card rendered only at export time, then rasterized into the PDF -->
+  <div class="export-card" id="export-card" aria-hidden="true">
+    <div class="export-topline">
+      <span class="export-brand">Logging &amp; Monitoring Agent Decisions</span>
+      <span class="export-date" id="export-date"></span>
+    </div>
+    <h1 class="export-title">Quiz results</h1>
+    <p class="export-headline" id="export-headline"></p>
+    <div class="export-main">
+      <div class="export-ring-wrap">
+        <svg class="export-ring" viewBox="0 0 168 168">
+          <circle class="export-ring-track" cx="84" cy="84" r="74"></circle>
+          <circle class="export-ring-fill" id="export-ring-fill" cx="84" cy="84" r="74"></circle>
+        </svg>
+        <div class="export-ring-center">
+          <span class="export-score-num" id="export-score-num"></span>
+          <span class="export-score-pct" id="export-score-pct"></span>
+        </div>
+      </div>
+      <div class="export-side">
+        <p class="export-side-label">By architecture</p>
+        <div id="export-breakdown"></div>
+      </div>
+    </div>
+    <div class="export-callout" id="export-callout" hidden></div>
+    <div class="export-footer">
+      <span>IEM Gen AI COE · Made by Hrichik Khandait</span>
+      <span id="export-footer-date"></span>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script>
+    const ARCH_LABELS = { gan:'Decision & System Logs', vae:'Tools & Metrics', diffusion:'Monitoring & Safety Signals', autoregressive:'Traceability & Best Practices' };
+    const score = Number(localStorage.getItem('quizScore') || 0);
+    const total = Number(localStorage.getItem('quizTotal') || 0);
+    let stats = {};
+    try { stats = JSON.parse(localStorage.getItem('quizCategoryStats') || '{}'); } catch (e) { stats = {}; }
+    let lastPerArch = [];
+    let lastCallout = null;
+    let lastPct = 0;
+
+    if (!total){
+      document.getElementById('empty-view').hidden = false;
+    } else {
+      document.getElementById('results-view').hidden = false;
+      renderResults();
+    }
+
+    function tierColor(pct){
+      if (pct >= 80) return 'var(--vae)';
+      if (pct >= 50) return 'var(--diffusion)';
+      return 'var(--gan)';
+    }
+
+    function tierMessage(pct){
+      if (pct >= 90) return 'Outstanding — you have a strong grasp of every pillar of agent observability covered.';
+      if (pct >= 80) return 'Great work — a solid, well-rounded understanding of the material.';
+      if (pct >= 50) return 'Solid effort. A little more review on the weaker areas below will sharpen things up.';
+      return 'Good start. Revisit the sections below, then give the quiz another attempt.';
+    }
+
+    function renderResults(){
+      const pct = total ? Math.round((score / total) * 100) : 0;
+      const color = tierColor(pct);
+      lastPct = pct;
+
+      document.getElementById('completed-date').textContent = 'Completed ' + new Date().toLocaleDateString(undefined, { month:'long', day:'numeric', year:'numeric' });
+      document.getElementById('score-display').textContent = score + ' / ' + total;
+      document.getElementById('score-pct').textContent = pct + '%';
+      document.getElementById('score-sub').textContent = tierMessage(pct);
+
+      const ring = document.getElementById('ring-fill');
+      const radius = 74;
+      const circumference = 2 * Math.PI * radius;
+      ring.style.stroke = color;
+      ring.style.strokeDasharray = circumference + ' ' + circumference;
+      ring.style.strokeDashoffset = circumference;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          ring.style.strokeDashoffset = circumference * (1 - pct / 100);
+        });
+      });
+
+      const breakdown = document.getElementById('breakdown');
+      const perArch = [];
+      Object.keys(ARCH_LABELS).forEach(key => {
+        const s = stats[key] || { correct: 0, total: 0 };
+        if (!s.total) return;
+        const archPct = Math.round((s.correct / s.total) * 100);
+        perArch.push({ key, pct: archPct });
+
+        const row = document.createElement('div');
+        row.className = 'break-row';
+        const label = document.createElement('div');
+        label.className = 'break-label';
+        const name = document.createElement('span');
+        name.className = 'name';
+        name.innerHTML = '<span class="break-dot dot-' + key + '"></span>' + ARCH_LABELS[key];
+        const count = document.createElement('span');
+        count.textContent = s.correct + ' / ' + s.total;
+        label.appendChild(name);
+        label.appendChild(count);
+        const track = document.createElement('div');
+        track.className = 'break-track';
+        track.setAttribute('role', 'progressbar');
+        track.setAttribute('aria-valuemin', '0');
+        track.setAttribute('aria-valuemax', '100');
+        track.setAttribute('aria-valuenow', String(archPct));
+        track.setAttribute('aria-label', ARCH_LABELS[key] + ' score');
+        const fill = document.createElement('div');
+        fill.className = 'break-fill fill-' + key;
+        track.appendChild(fill);
+        row.appendChild(label);
+        row.appendChild(track);
+        breakdown.appendChild(row);
+
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            fill.style.width = archPct + '%';
+          });
+        });
+      });
+
+      lastPerArch = perArch.slice();
+      lastCallout = null;
+
+      if (perArch.length >= 2){
+        perArch.sort((a, b) => b.pct - a.pct);
+        const strongest = perArch[0];
+        const weakest = perArch[perArch.length - 1];
+        if (strongest.pct !== weakest.pct){
+          lastCallout = { strongest, weakest };
+          const callout = document.getElementById('callout');
+          callout.hidden = false;
+          callout.innerHTML =
+            '<span>Strongest: <span class="hl">' + ARCH_LABELS[strongest.key] + '</span> (' + strongest.pct + '%)</span>' +
+            '<span>Focus next: <span class="hl">' + ARCH_LABELS[weakest.key] + '</span> (' + weakest.pct + '%)</span>';
+        }
+      }
+    }
+
+    function fillExportCard(){
+      const pct = lastPct;
+      const color = tierColor(pct);
+      const dateStr = new Date().toLocaleDateString(undefined, { month:'long', day:'numeric', year:'numeric' });
+
+      document.getElementById('export-date').textContent = dateStr;
+      document.getElementById('export-footer-date').textContent = 'Generated ' + dateStr;
+      document.getElementById('export-headline').textContent = tierMessage(pct);
+      document.getElementById('export-score-num').textContent = score + ' / ' + total;
+      document.getElementById('export-score-pct').textContent = pct + '%';
+
+      const ring = document.getElementById('export-ring-fill');
+      const radius = 74;
+      const circumference = 2 * Math.PI * radius;
+      ring.style.stroke = color;
+      ring.style.strokeDasharray = circumference + ' ' + circumference;
+      ring.style.strokeDashoffset = String(circumference * (1 - pct / 100));
+
+      const breakdown = document.getElementById('export-breakdown');
+      breakdown.innerHTML = '';
+      lastPerArch.forEach(({ key, pct: archPct }) => {
+        const s = stats[key] || { correct: 0, total: 0 };
+        const row = document.createElement('div');
+        row.className = 'export-break-row';
+        row.innerHTML =
+          '<div class="export-break-label"><span class="name"><span class="export-dot" style="background:var(--' + key + ')"></span>' + ARCH_LABELS[key] + '</span><span>' + s.correct + ' / ' + s.total + '</span></div>' +
+          '<div class="export-break-track"><div class="export-break-fill" style="width:' + archPct + '%; background:var(--' + key + ')"></div></div>';
+        breakdown.appendChild(row);
+      });
+
+      const callout = document.getElementById('export-callout');
+      if (lastCallout){
+        callout.hidden = false;
+        callout.innerHTML =
+          '<span>Strongest: <span class="hl">' + ARCH_LABELS[lastCallout.strongest.key] + '</span> (' + lastCallout.strongest.pct + '%)</span>' +
+          '<span>Focus next: <span class="hl">' + ARCH_LABELS[lastCallout.weakest.key] + '</span> (' + lastCallout.weakest.pct + '%)</span>';
+      } else {
+        callout.hidden = true;
+      }
+    }
+
+    async function downloadResults(){
+      const btn = document.getElementById('download-btn');
+      const originalLabel = btn.textContent;
+      btn.textContent = 'Preparing PDF…';
+      btn.disabled = true;
+      try{
+        fillExportCard();
+        const node = document.getElementById('export-card');
+        const canvas = await html2canvas(node, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+        const imgData = canvas.toDataURL('image/png');
+
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const margin = 40;
+        const imgWidth = pageWidth - margin * 2;
+        const imgHeight = (canvas.height / canvas.width) * imgWidth;
+        pdf.addImage(imgData, 'PNG', margin, margin, imgWidth, imgHeight);
+        pdf.save('Agent_Monitoring_Quiz_Scorecard.pdf');
+      } catch (err){
+        console.error('PDF export failed:', err);
+        alert('Could not generate the PDF. Please try again.');
+      } finally {
+        btn.textContent = originalLabel;
+        btn.disabled = false;
+      }
+    }
+  </script>
+  <script>
+    /* ---------- theme toggle (shared logic, all pages) ---------- */
+    (function(){
+      var SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.2"></circle><path d="M12 2.5v2.4M12 19.1v2.4M4.4 4.4l1.7 1.7M17.9 17.9l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.4 19.6l1.7-1.7M17.9 6.1l1.7-1.7"></path></svg>';
+      var MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 14.5A8.5 8.5 0 1 1 9.5 3.5a7 7 0 0 0 11 11Z"></path></svg>';
+
+      function current(){ return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'; }
+
+      function paint(t){
+        var btn = document.getElementById('theme-toggle');
+        if(!btn) return;
+        btn.innerHTML = t === 'dark' ? SUN : MOON;
+        btn.setAttribute('aria-label', t === 'dark' ? 'Switch to light theme' : 'Switch to dark theme');
+      }
+
+      function setTheme(t){
+        document.documentElement.setAttribute('data-theme', t);
+        try{ localStorage.setItem('theme', t); }catch(e){}
+        paint(t);
+      }
+
+      window.addEventListener('DOMContentLoaded', function(){
+        paint(current());
+        var btn = document.getElementById('theme-toggle');
+        if(btn){ btn.addEventListener('click', function(){ setTheme(current() === 'dark' ? 'light' : 'dark'); }); }
+      });
+
+      /* keep in sync if the theme is changed on another tab/page */
+      window.addEventListener('storage', function(e){
+        if(e.key === 'theme' && e.newValue){ document.documentElement.setAttribute('data-theme', e.newValue); paint(e.newValue); }
+      });
+    })();
+  </script>
+</body>
+</html>

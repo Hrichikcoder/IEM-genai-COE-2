@@ -1,0 +1,2086 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Monitoring Quiz</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<script>
+  /* Applied before paint to avoid a flash of the wrong theme */
+  (function(){
+    try{
+      var t = localStorage.getItem('theme');
+      if(!t){ t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
+      document.documentElement.setAttribute('data-theme', t);
+    }catch(e){ document.documentElement.setAttribute('data-theme', 'light'); }
+  })();
+</script>
+<style>
+  :root{
+    --ink:#1a1815;
+    --paper:#ffffff;
+    --paper-dim:#e7ddc4;
+    --surface-alt:#fffdf8;
+    --surface-solid:#ffffff;
+    --line:#d4c7a8;
+    --border-hover:#a9976e;
+    --muted:#6b6255;
+    --hover-bg:#f1e8d2;
+    --selected-bg:#ece0c3;
+    --shadow-1: rgba(30,22,10,0.07);
+    --shadow-2: rgba(30,22,10,0.18);
+    --skipped-bg:#f5e6c2;
+    --selected-sentence-bg:#f0d2c9;
+    --hotspot-selected-bg:#dde6d4;
+    --hotspot-hover-border:#bdb6a2;
+    --btn-bg:#1a1815;
+    --btn-text:#fffdf8;
+    --gan:#b85c50;
+    --vae:#5c7f57;
+    --diffusion:#b9822e;
+    --autoregressive:#5a6f99;
+  }
+  [data-theme="dark"]{
+    --ink:#f7f5f0;
+    --paper:#1c1f26;
+    --paper-dim:#14161a;
+    --surface-alt:#262a33;
+    --surface-solid:#2a2e37;
+    --line:#3a3d45;
+    --border-hover:#565962;
+    --muted:#9a9791;
+    --hover-bg:#2b2e37;
+    --selected-bg:#30343f;
+    --shadow-1: rgba(0,0,0,0.3);
+    --shadow-2: rgba(0,0,0,0.45);
+    --skipped-bg:#3a3324;
+    --selected-sentence-bg:#4a2530;
+    --hotspot-selected-bg:#333829;
+    --hotspot-hover-border:#6b6e78;
+    --btn-bg:#f7f5f0;
+    --btn-text:#14161a;
+    --gan:#d97e6e;
+    --vae:#7fae78;
+    --diffusion:#d9a256;
+    --autoregressive:#7c93c2;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    min-height:100vh;
+    background:var(--paper-dim);
+    font-family:'IBM Plex Sans', sans-serif;
+    color:var(--ink);
+    display:flex;
+    justify-content:center;
+    padding:36px 20px;
+    transition:background 0.2s ease, color 0.2s ease;
+  }
+  .shell{ width:100%; max-width:920px; }
+
+  .topbar{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    margin-bottom:20px;
+  }
+  .topbar a{
+    color:var(--muted);
+    font-size:0.85rem;
+    text-decoration:none;
+  }
+  .topbar a:hover{ color:var(--ink); }
+  .topbar-right{ display:flex; align-items:center; gap:14px; }
+  .kbd-hint{ font-size:0.72rem; color:var(--muted); }
+  .kbd-hint kbd{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.68rem;
+    border:1px solid var(--line);
+    border-bottom-width:2px;
+    border-radius:4px;
+    padding:1px 5px;
+    background:var(--surface-solid);
+  }
+  .theme-toggle{
+    width:32px;
+    height:32px;
+    border-radius:50%;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    flex:none;
+    transition:border-color 0.15s ease;
+  }
+  .theme-toggle:hover{ border-color:var(--border-hover); }
+  .theme-toggle svg{ width:16px; height:16px; }
+  @media (max-width:760px){ .kbd-hint{ display:none; } }
+  .index-num{
+    font-family:'Fraunces', serif;
+    font-size:1.15rem;
+    color:var(--ink);
+  }
+
+  /* ---------- two-column layout ---------- */
+  .layout{
+    display:grid;
+    grid-template-columns:212px 1fr;
+    gap:26px;
+    align-items:start;
+  }
+  @media (max-width:760px){
+    .layout{ grid-template-columns:1fr; }
+  }
+
+  .sidebar{
+    position:sticky;
+    top:24px;
+    background:var(--paper);
+    border-radius:16px;
+    padding:20px;
+    box-shadow:0 1px 2px var(--shadow-1), 0 12px 30px var(--shadow-2);
+  }
+  @media (max-width:760px){ .sidebar{ position:static; } }
+
+  .sidebar-hint{
+    font-size:0.72rem;
+    color:var(--muted);
+    line-height:1.45;
+    margin:0 0 14px 0;
+  }
+  .sidebar-label{
+    font-size:0.68rem;
+    font-weight:600;
+    color:var(--muted);
+    margin:0 0 8px 0;
+  }
+  .qtype-dropdown{ position:relative; margin-bottom:16px; }
+  .qtype-toggle{
+    width:100%;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    padding:9px 12px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--surface-alt);
+    color:var(--ink);
+    font-family:inherit;
+    font-size:0.82rem;
+    cursor:pointer;
+    transition:border-color 0.15s ease;
+  }
+  .qtype-toggle:hover{ border-color:var(--border-hover); }
+  .qtype-toggle:focus-visible{ outline:2px solid var(--ink); outline-offset:2px; }
+  .qtype-caret{ width:14px; height:14px; flex:none; color:var(--muted); transition:transform 0.15s ease; }
+  .qtype-toggle[aria-expanded="true"] .qtype-caret{ transform:rotate(180deg); }
+  .qtype-menu{
+    position:absolute;
+    top:calc(100% + 6px);
+    left:0;
+    right:0;
+    z-index:20;
+    background:var(--surface-solid);
+    border:1px solid var(--line);
+    border-radius:10px;
+    box-shadow:0 8px 24px var(--shadow-2);
+    padding:6px;
+    max-height:240px;
+    overflow-y:auto;
+  }
+  .qtype-option{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    width:100%;
+    padding:8px 10px;
+    border-radius:7px;
+    border:1px solid transparent;
+    background:none;
+    font-family:inherit;
+    font-size:0.8rem;
+    color:var(--ink);
+    cursor:pointer;
+    text-align:left;
+  }
+  .qtype-option:hover{ background:var(--hover-bg); }
+  .qtype-option.qtype-option-active{ border-color:var(--ink); background:var(--selected-bg); font-weight:600; }
+  .qtype-option .count{ color:var(--muted); font-family:'IBM Plex Mono', monospace; font-size:0.7rem; }
+
+  .legend{ display:flex; flex-direction:column; gap:4px; margin-bottom:16px; }
+  .legend-chip{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:6px 8px;
+    border-radius:8px;
+    border:1px solid transparent;
+    background:none;
+    font-family:inherit;
+    font-size:0.76rem;
+    color:var(--ink);
+    cursor:pointer;
+    text-align:left;
+  }
+  .legend-chip:hover{ border-color:var(--line); background:var(--surface-alt); }
+  .legend-dot{ width:9px; height:9px; border-radius:50%; flex:none; }
+  .legend-name{ flex:1; }
+  .legend-count{ color:var(--muted); font-family:'IBM Plex Mono', monospace; font-size:0.7rem; }
+
+  .nav-panel{
+    margin-bottom:26px;
+    background:var(--paper);
+    border-radius:16px;
+    padding:20px 22px;
+    box-shadow:0 1px 2px var(--shadow-1), 0 12px 30px var(--shadow-2);
+  }
+  .nav-panel-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:12px;
+  }
+  .nav-panel-header .sidebar-label{ margin-bottom:0; }
+  .nav-panel-toggle{
+    font-family:inherit;
+    font-size:0.74rem;
+    color:var(--muted);
+    background:none;
+    border:1px solid var(--line);
+    border-radius:20px;
+    padding:4px 12px;
+    cursor:pointer;
+    transition:border-color 0.15s ease, color 0.15s ease;
+  }
+  .nav-panel-toggle:hover{ border-color:var(--border-hover); color:var(--ink); }
+  .nav-panel.collapsed .nav-panel-body{ display:none; }
+
+  .navigator{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(42px, 1fr));
+    gap:8px;
+  }
+  .nav-cell{
+    aspect-ratio:1/1;
+    border-radius:7px;
+    border:1px solid var(--line);
+    background:var(--surface-alt);
+    color:var(--muted);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.72rem;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    transition:border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  }
+  .nav-cell:hover{ border-color:var(--border-hover); }
+  .nav-cell.answered{ color:#fff; border-color:transparent; }
+  .nav-cell.nav-arch-gan.answered{ background:var(--gan); }
+  .nav-cell.nav-arch-vae.answered{ background:var(--vae); }
+  .nav-cell.nav-arch-diffusion.answered{ background:var(--diffusion); }
+  .nav-cell.nav-arch-autoregressive.answered{ background:var(--autoregressive); }
+  .nav-cell.current{ outline:2px solid var(--ink); outline-offset:2px; font-weight:600; }
+
+  .card{
+    background:var(--paper);
+    border-radius:16px;
+    padding:36px 32px;
+    box-shadow:0 1px 2px var(--shadow-1), 0 12px 30px var(--shadow-2);
+    transition:background 0.2s ease;
+  }
+
+  .tagrow{ display:flex; align-items:center; gap:10px; margin-bottom:18px; flex-wrap:wrap; }
+  .tag{
+    font-size:0.72rem;
+    font-weight:600;
+    padding:4px 10px;
+    border-radius:20px;
+    color:#fff;
+  }
+  .tag-gan{ background:var(--gan); }
+  .tag-vae{ background:var(--vae); }
+  .tag-diffusion{ background:var(--diffusion); }
+  .tag-autoregressive{ background:var(--autoregressive); }
+  .type-chip{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-size:0.82rem;
+    color:var(--muted);
+    background:var(--surface-alt);
+    border:1px solid var(--line);
+    border-radius:20px;
+    padding:4px 10px 4px 8px;
+  }
+  .type-chip svg{ width:14px; height:14px; flex:none; }
+
+  @keyframes qfade{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:translateY(0); } }
+  #question-area.q-anim{ animation:qfade 0.28s ease; }
+
+  .question-text{
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    font-size:1.4rem;
+    line-height:1.35;
+    margin:0 0 26px 0;
+  }
+
+  .answer-body{ min-height:60px; }
+
+  /* multiple choice / true-false */
+  .mc-list{ display:flex; flex-direction:column; gap:10px; }
+  .option-label{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    background:var(--surface-alt);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:13px 16px;
+    cursor:pointer;
+    transition:border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
+    font-size:0.98rem;
+    color:var(--ink);
+  }
+  .option-label:hover{ border-color:var(--border-hover); }
+  .option-label.selected{ border-color:var(--ink); background:var(--selected-bg); }
+  .option-label:active{ transform:scale(0.995); }
+  .option-label input{ accent-color:var(--ink); }
+
+  /* text input */
+  .text-input{
+    width:100%;
+    padding:13px 16px;
+    border-radius:10px;
+    border:1px solid var(--line);
+    background:var(--surface-alt);
+    color:var(--ink);
+    font-size:1rem;
+    font-family:inherit;
+  }
+  .text-input:focus{ outline:2px solid var(--ink); outline-offset:1px; }
+
+  /* dropdown inline */
+  .inline-question{
+    font-family:'Fraunces', serif;
+    font-size:1.2rem;
+    line-height:1.9;
+  }
+  .inline-select{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.85rem;
+    padding:4px 8px;
+    margin:0 3px;
+    border-radius:6px;
+    border:1px solid var(--ink);
+    background:var(--surface-solid);
+    color:var(--ink);
+  }
+
+  /* sequence flow (sequencing / drag-and-drop / flowchart) */
+  .seq-hint, .match-hint{ font-size:0.78rem; color:var(--muted); margin:0 0 14px 0; }
+  .seq-flow{ display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+  .seq-block{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    background:var(--surface-alt);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:11px 14px;
+    font-size:0.9rem;
+    color:var(--ink);
+    cursor:grab;
+    touch-action:none;
+    user-select:none;
+    transition:border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .seq-block:hover{ border-color:var(--border-hover); }
+  .seq-block:active{ cursor:grabbing; }
+  .seq-block-hidden{ opacity:0.22; }
+  .seq-num{
+    display:flex; align-items:center; justify-content:center;
+    width:20px; height:20px; border-radius:50%;
+    background:var(--ink); color:var(--btn-text);
+    font-size:0.7rem; font-family:'IBM Plex Mono', monospace;
+    flex:none;
+  }
+  .seq-text{ flex:1; }
+  .seq-handle{ color:var(--muted); font-size:0.8rem; letter-spacing:1px; flex:none; }
+  .seq-arrow{ color:var(--muted); display:flex; align-items:center; flex:none; }
+  .seq-arrow svg{ width:20px; height:20px; }
+  .seq-block-ghost{
+    position:fixed;
+    pointer-events:none;
+    z-index:999;
+    box-shadow:0 8px 24px var(--shadow-2);
+    background:var(--surface-solid);
+    border-color:var(--ink);
+  }
+  @media (max-width:640px){
+    .seq-flow{ flex-direction:column; align-items:stretch; }
+    .seq-arrow{ transform:rotate(90deg); align-self:center; }
+  }
+
+  /* categorization */
+  .cat-list{ display:flex; flex-direction:column; gap:10px; }
+  .cat-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:14px;
+    background:var(--surface-alt);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:11px 14px;
+  }
+  .cat-item-text{ font-size:0.94rem; color:var(--ink); }
+  .cat-select{
+    font-family:inherit;
+    font-size:0.88rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--surface-solid);
+    color:var(--ink);
+    max-width:220px;
+  }
+
+  /* matching (drag-to-connect) */
+  .match-board{ display:flex; flex-direction:column; gap:20px; }
+  .match-rows{ display:flex; flex-direction:column; gap:10px; }
+  .match-row2{ display:flex; align-items:center; gap:10px; }
+  .match-block{
+    background:var(--surface-alt);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:11px 14px;
+    font-size:0.9rem;
+    color:var(--ink);
+  }
+  .match-block-left{ flex:1 1 40%; min-width:0; }
+  .match-arrow{ color:var(--muted); flex:none; display:flex; align-items:center; }
+  .match-arrow svg{ width:18px; height:18px; }
+  .match-slot{
+    flex:1 1 50%;
+    min-width:0;
+    min-height:44px;
+    border-radius:10px;
+    border:1.5px dashed var(--line);
+    display:flex;
+    align-items:center;
+    padding:4px 6px;
+    font-size:0.8rem;
+    color:var(--muted);
+    transition:border-color 0.15s ease, background 0.15s ease;
+  }
+  .match-slot.filled{ border-style:solid; padding:0; }
+  .match-slot.drop-hover{ border-color:var(--ink); background:var(--hover-bg); }
+  .match-pool{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    padding-top:16px;
+    border-top:1px dashed var(--line);
+    min-height:20px;
+  }
+  .match-pool::before{
+    content:'Available matches';
+    width:100%;
+    font-size:0.68rem;
+    font-weight:600;
+    color:var(--muted);
+    margin-bottom:2px;
+  }
+  .match-pool-empty::before{ content:'All matched'; }
+  .match-chip{
+    background:var(--surface-solid);
+    border:1px solid var(--line);
+    border-radius:999px;
+    padding:8px 14px;
+    font-size:0.85rem;
+    color:var(--ink);
+    cursor:grab;
+    touch-action:none;
+    user-select:none;
+    transition:border-color 0.15s ease;
+  }
+  .match-chip:hover{ border-color:var(--border-hover); }
+  .match-slot.filled .match-chip{ width:100%; border-radius:9px; cursor:pointer; }
+  .match-chip-ghost{
+    position:fixed;
+    pointer-events:none;
+    z-index:999;
+    box-shadow:0 8px 24px var(--shadow-2);
+  }
+  @media (max-width:640px){
+    .match-row2{ flex-wrap:wrap; }
+    .match-block-left{ flex:1 1 100%; }
+    .match-arrow{ display:none; }
+    .match-slot{ flex:1 1 100%; }
+  }
+
+  /* slider */
+  .slider-wrap{ text-align:center; }
+  .slider-visual{ font-size:4rem; margin-bottom:18px; transition:filter 0.1s linear, opacity 0.1s linear; }
+  .slider-wrap input[type=range]{ width:100%; accent-color:var(--diffusion); }
+  .slider-labels{ display:flex; justify-content:space-between; font-size:0.78rem; color:var(--muted); margin-top:8px; }
+
+  /* text selection */
+  .selectable-passage{ font-size:1rem; line-height:1.9; }
+  .sel-sentence{ cursor:pointer; border-radius:4px; padding:1px 2px; }
+  .sel-sentence:hover{ background:var(--hover-bg); }
+  .selected-sentence{ background:var(--selected-sentence-bg); box-shadow:0 0 0 1px var(--gan) inset; }
+
+  /* hotspot */
+  .hotspot-diagram{ width:100%; height:auto; }
+  .hotspot-zone rect{ fill:var(--surface-alt); stroke:var(--line); stroke-width:1.5; transition:fill 0.15s ease, stroke 0.15s ease; cursor:pointer; }
+  .hotspot-zone text{ font-family:'IBM Plex Sans', sans-serif; font-size:11px; fill:var(--ink); pointer-events:none; }
+  .hotspot-zone:hover rect{ stroke:var(--hotspot-hover-border); }
+  .hotspot-zone.zone-selected rect{ fill:var(--hotspot-selected-bg); stroke:var(--ink); stroke-width:2; }
+  .hotspot-hint{ font-size:0.8rem; color:var(--muted); margin-top:10px; }
+
+  .nav-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:30px;
+    gap:10px;
+  }
+  .nav-row-right{ display:flex; align-items:center; gap:10px; }
+  .nav-btn{
+    padding:12px 20px;
+    border-radius:9px;
+    border:1px solid var(--line);
+    background:var(--surface-solid);
+    color:var(--ink);
+    font-family:inherit;
+    font-size:0.92rem;
+    font-weight:500;
+    cursor:pointer;
+    transition:border-color 0.15s ease;
+  }
+  .nav-btn:disabled{ opacity:0.35; cursor:not-allowed; }
+  .nav-btn:not(:disabled):hover{ border-color:var(--ink); }
+  #save-next-btn{ background:var(--btn-bg); color:var(--btn-text); border-color:var(--btn-bg); }
+  #submit-btn{ background:var(--diffusion); color:#fff; border-color:var(--diffusion); display:none; }
+
+  /* ---------- status counters ---------- */
+  .status-row{
+    display:grid;
+    grid-template-columns:repeat(3, 1fr);
+    gap:6px;
+    margin-bottom:16px;
+  }
+  .status-stat{
+    background:var(--surface-alt);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:8px 4px;
+    text-align:center;
+  }
+  .status-stat .num{
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    font-size:1.05rem;
+    display:block;
+    line-height:1.2;
+  }
+  .status-stat .lbl{ font-size:0.6rem; color:var(--muted); }
+  .status-stat.stat-unvisited .num{ color:var(--muted); }
+  .status-stat.stat-skipped .num{ color:var(--diffusion); }
+  .status-stat.stat-answered .num{ color:var(--ink); }
+
+  /* ---------- navigator skipped state ---------- */
+  .nav-cell.skipped{
+    border:1px dashed var(--diffusion);
+    background:var(--skipped-bg);
+    color:var(--diffusion);
+  }
+
+  /* ---------- filtering ---------- */
+  .filter-banner{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    background:var(--selected-bg);
+    border:1px solid var(--border-hover);
+    border-radius:9px;
+    padding:8px 8px 8px 12px;
+    margin-bottom:14px;
+    font-size:0.76rem;
+    color:var(--ink);
+  }
+  .filter-banner strong{ font-weight:600; }
+  .filter-clear-btn{
+    width:22px; height:22px;
+    border-radius:50%;
+    border:1px solid transparent;
+    background:none;
+    color:var(--muted);
+    font-size:0.8rem;
+    line-height:1;
+    cursor:pointer;
+    flex:none;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .filter-clear-btn:hover{ background:var(--paper); color:var(--ink); }
+
+  .status-stat{
+    font-family:inherit;
+    color:inherit;
+    appearance:none;
+    -webkit-appearance:none;
+    margin:0;
+    width:100%;
+    display:block;
+    cursor:pointer;
+    transition:border-color 0.15s ease, background 0.15s ease;
+  }
+  .status-stat.tile-active{ border-color:var(--ink); background:var(--selected-bg); }
+
+  .legend-chip.chip-active{ border-color:var(--ink); background:var(--selected-bg); font-weight:600; }
+
+  .flag-filter{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    width:100%;
+    padding:6px 8px;
+    border-radius:8px;
+    border:1px solid transparent;
+    background:none;
+    font-family:inherit;
+    font-size:0.76rem;
+    color:var(--ink);
+    cursor:pointer;
+    text-align:left;
+    margin-top:2px;
+    margin-bottom:16px;
+  }
+  .flag-filter:hover{ border-color:var(--line); background:var(--surface-alt); }
+  .flag-filter svg{ width:14px; height:14px; flex:none; color:var(--muted); }
+  .flag-filter .legend-name{ flex:1; }
+
+  .navigator-empty{
+    font-size:0.8rem;
+    color:var(--muted);
+    text-align:center;
+    padding:18px 8px;
+    border:1px dashed var(--line);
+    border-radius:10px;
+    margin-top:14px;
+  }
+
+  /* ---------- flag-for-review ---------- */
+  .flag-btn{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    margin-left:auto;
+    padding:5px 12px 5px 10px;
+    border-radius:20px;
+    border:1px solid var(--line);
+    background:var(--surface-alt);
+    color:var(--muted);
+    font-family:inherit;
+    font-size:0.78rem;
+    cursor:pointer;
+    transition:border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  }
+  .flag-btn svg{ width:13px; height:13px; flex:none; }
+  .flag-btn:hover{ border-color:var(--border-hover); }
+  .flag-btn.active{ background:var(--btn-bg); color:var(--btn-text); border-color:var(--btn-bg); }
+
+  .nav-cell{ position:relative; }
+  .nav-cell.flagged::after{
+    content:'';
+    position:absolute;
+    top:-3px; right:-3px;
+    width:7px; height:7px;
+    border-radius:50%;
+    background:var(--ink);
+    border:1.5px solid var(--paper);
+  }
+  .nav-cell.nav-hidden{ display:none; }
+
+  [hidden]{ display:none !important; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <a href="index.html">← Exit quiz</a>
+    <div class="topbar-right">
+      <span class="kbd-hint"><kbd>←</kbd> <kbd>→</kbd> to navigate</span>
+      <span class="index-num" id="question-index">1 / 30</span>
+      <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Toggle theme"></button>
+    </div>
+  </div>
+
+  <section class="nav-panel" id="nav-panel">
+    <div class="nav-panel-header">
+      <p class="sidebar-label">All questions</p>
+      <button type="button" class="nav-panel-toggle" id="nav-panel-toggle">Hide</button>
+    </div>
+    <div class="nav-panel-body" id="nav-panel-body">
+      <div class="navigator" id="navigator"></div>
+      <p class="navigator-empty" id="navigator-empty" hidden>No questions match this filter yet.</p>
+    </div>
+  </section>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <p class="sidebar-hint">Tap a status, topic or type below to filter the question grid.</p>
+      <div class="filter-banner" id="filter-banner" hidden>
+        <span id="filter-banner-text"></span>
+        <button type="button" class="filter-clear-btn" id="filter-clear-btn" aria-label="Clear filter">✕</button>
+      </div>
+
+      <p class="sidebar-label">Status</p>
+      <div class="status-row" id="status-row">
+        <button type="button" class="status-stat stat-unvisited" id="stat-tile-unvisited" title="Filter by unvisited questions">
+          <span class="num" id="stat-unvisited">0</span>
+          <span class="lbl">Unvisited</span>
+        </button>
+        <button type="button" class="status-stat stat-skipped" id="stat-tile-skipped" title="Filter by skipped questions">
+          <span class="num" id="stat-skipped">0</span>
+          <span class="lbl">Skipped</span>
+        </button>
+        <button type="button" class="status-stat stat-answered" id="stat-tile-answered" title="Filter by answered questions">
+          <span class="num" id="stat-answered">0</span>
+          <span class="lbl">Answered</span>
+        </button>
+      </div>
+      <button type="button" class="flag-filter" id="stat-tile-flagged" title="Filter by flagged questions">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4h13l-3 4 3 4H5"/></svg>
+        <span class="legend-name">Marked for Revisit</span>
+        <span class="legend-count" id="stat-flagged">0</span>
+      </button>
+
+      <p class="sidebar-label">Topic</p>
+      <div class="legend" id="legend"></div>
+
+      <p class="sidebar-label">Question type</p>
+      <div class="qtype-dropdown">
+        <button type="button" class="qtype-toggle" id="qtype-toggle" aria-haspopup="true" aria-expanded="false">
+          <span id="qtype-toggle-label">All types</span>
+          <svg class="qtype-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div class="qtype-menu" id="qtype-menu" hidden></div>
+      </div>
+    </aside>
+
+    <div class="card">
+      <div class="tagrow">
+        <span class="tag" id="arch-tag"></span>
+        <span class="type-chip" id="type-chip"></span>
+        <button type="button" class="flag-btn" id="flag-btn" aria-label="Flag this question for review">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4h13l-3 4 3 4H5"/></svg>
+          <span>Marked For Revisit</span>
+        </button>
+      </div>
+      <div id="question-area"></div>
+
+      <div class="nav-row">
+        <button class="nav-btn" id="prev-btn" onclick="changeQuestion(-1)" disabled>Previous</button>
+        <div class="nav-row-right">
+          <button class="nav-btn" id="next-btn" onclick="changeQuestion(1)">Next</button>
+          <button class="nav-btn" id="save-next-btn" onclick="saveAndNext()">Save &amp; Next</button>
+          <button class="nav-btn" id="submit-btn" onclick="submitQuiz()">Submit quiz</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p style="text-align:center;font-size:0.74rem;color:var(--muted);margin:22px 0 0;">Made by Hrichik Khandait</p>
+</div>
+
+<script>
+    // ---- Logging & Monitoring Agent Decisions · 30-question set ----
+    const quizData = [
+      {
+      "id": 1,
+      "type": "multiple_choice",
+      "question": "Which of these is classified as a Decision-Level Log for an AI agent, according to the deck?",
+      "options": [
+      "The confidence or probability score behind the agent's chosen action",
+      "The cloud region hosting the monitoring dashboard",
+      "The marketing budget for the AI product",
+      "The color scheme of the user interface"
+      ],
+      "answer": "The confidence or probability score behind the agent's chosen action"
+      },
+      {
+      "id": 2,
+      "type": "multiple_choice",
+      "question": "Which item belongs under System-Level Logs in the deck's log categories?",
+      "options": [
+      "Latency and resource consumption",
+      "User intent inferred from prompts",
+      "Environment state such as geolocation",
+      "State-action-reward tuples for RL agents"
+      ],
+      "answer": "Latency and resource consumption"
+      },
+      {
+      "id": 3,
+      "type": "multiple_choice",
+      "question": "Which of the following is an example of a Contextual Log, per the deck?",
+      "options": [
+      "Time, session ID, and agent role",
+      "API calls and tool usage",
+      "Policy version or model ID",
+      "Response latency"
+      ],
+      "answer": "Time, session ID, and agent role"
+      },
+      {
+      "id": 4,
+      "type": "multiple_choice",
+      "question": "Under Decision-Level Logs, what does logging the 'policy version or model ID' primarily help teams do?",
+      "options": [
+      "Trace updates to the reinforcement-learning policy or generative model over time",
+      "Calculate the agent's API cost per task",
+      "Detect tool misuse in real time",
+      "Redact sensitive user data automatically"
+      ],
+      "answer": "Trace updates to the reinforcement-learning policy or generative model over time"
+      },
+      {
+      "id": 5,
+      "type": "multiple_choice",
+      "question": "According to the deck, what is OpenTelemetry used for in agent monitoring?",
+      "options": [
+      "Distributed tracing of agent decisions",
+      "Aggregating logs for search and visualization",
+      "Time-series metrics for real-time dashboards",
+      "Cloud-native observability for enterprise agents"
+      ],
+      "answer": "Distributed tracing of agent decisions"
+      },
+      {
+      "id": 6,
+      "type": "multiple_choice",
+      "question": "The deck lists the ELK Stack — Elasticsearch, Logstash, Kibana — as a tool mainly used to:",
+      "options": [
+      "Aggregate logs for search and visualization",
+      "Provide distributed tracing of agent decisions",
+      "Detect anomalies and send alerts",
+      "Track reinforcement-learning rewards"
+      ],
+      "answer": "Aggregate logs for search and visualization"
+      },
+      {
+      "id": 7,
+      "type": "multiple_choice",
+      "question": "Which pair of tools does the deck name for time-series metrics and real-time dashboards?",
+      "options": ["Prometheus + Grafana", "LangSmith + PromptLayer", "AutoGen + CrewAI", "CloudWatch + Datadog"],
+      "answer": "Prometheus + Grafana"
+      },
+      {
+      "id": 8,
+      "type": "multiple_choice",
+      "question": "According to the deck, Datadog is highlighted for its role in:",
+      "options": [
+      "Anomaly detection and alerting for AI systems",
+      "Distributed tracing of agent decisions",
+      "Aggregating logs for search and visualization",
+      "Chain-of-thought logging for RL agents"
+      ],
+      "answer": "Anomaly detection and alerting for AI systems"
+      },
+      {
+      "id": 9,
+      "type": "multiple_choice",
+      "question": "Which platforms does the deck name for cloud-native observability of enterprise agents?",
+      "options": ["CloudWatch and Azure Monitor", "LangSmith and PromptLayer", "ELK Stack", "Prometheus and Grafana"],
+      "answer": "CloudWatch and Azure Monitor"
+      },
+      {
+      "id": 10,
+      "type": "interactive_flowchart",
+      "question": "Arrange the stages of turning a raw agent decision into a resolved alert, based on the deck's tools and concepts.",
+      "interactiveConcept": "Users connect steps in order: 1) The decision-level log is captured -> 2) Logs are aggregated and indexed (e.g. via the ELK Stack) -> 3) Metrics are visualized on a real-time dashboard (e.g. Prometheus + Grafana) -> 4) Anomaly detection tooling flags a deviation (e.g. Datadog) -> 5) The alert is routed for human review.",
+      "answer": "Capture decision log -> Aggregate logs -> Visualize metrics -> Flag anomaly -> Route alert for review"
+      },
+      {
+      "id": 11,
+      "type": "multiple_choice",
+      "question": "Under Behavioral Metrics, what does 'policy deviation frequency' track?",
+      "options": [
+      "How often an agent takes actions that fall off its intended plan",
+      "The dollar cost of each API call",
+      "The number of session IDs logged per day",
+      "The geolocation of the user making a request"
+      ],
+      "answer": "How often an agent takes actions that fall off its intended plan"
+      },
+      {
+      "id": 12,
+      "type": "multiple_choice",
+      "question": "The deck lists 'looping or hallucination detection' under which category of monitoring metric?",
+      "options": ["Behavioral Metrics", "Performance Metrics", "Safety Metrics", "Contextual Logs"],
+      "answer": "Behavioral Metrics"
+      },
+      {
+      "id": 13,
+      "type": "multiple_choice",
+      "question": "Which of these is listed as a Safety Metric for AI agents in the deck?",
+      "options": ["Unsafe content triggers", "Response latency", "Throughput", "Cost per task"],
+      "answer": "Unsafe content triggers"
+      },
+      {
+      "id": 14,
+      "type": "interactive_matching",
+      "question": "Match each named tool to the category the deck places it under.",
+      "interactiveConcept": "A matching UI. Users connect: OpenTelemetry, ELK Stack, Prometheus + Grafana, and LangChain tracing to their category.",
+      "answer": "OpenTelemetry -> Logging Tools, ELK Stack -> Logging Tools, Prometheus + Grafana -> Monitoring & Alerting, LangChain tracing -> Agent-Specific Platforms"
+      },
+      {
+      "id": 15,
+      "type": "true_false",
+      "question": "According to the deck, logging answers the question 'What happened?' while monitoring answers 'Is something going wrong right now?'",
+      "answer": "True",
+      "explanation": "The deck frames logging as a retrospective record of agent actions, and monitoring as forward-looking detection of deviations or risks."
+      },
+      {
+      "id": 16,
+      "type": "fill_in_the_blanks",
+      "question": "In the deck's log categories, the group that includes input state, action chosen, and confidence scores is called ________-Level Logs.",
+      "answer": "Decision"
+      },
+      {
+      "id": 17,
+      "type": "dropdown_inline",
+      "question": "The deck notes that capturing {dropdown_options} data — such as geolocation or session details — belongs under Contextual Logs in real-world agent deployments.",
+      "dropdown_options": ["Environment state", "Reward signal", "Model checkpoint", "API rate limit"],
+      "answer": "Environment state"
+      },
+      {
+      "id": 18,
+      "type": "multiple_choice",
+      "question": "Why does the deck emphasize decision traceability for AI agents?",
+      "options": [
+      "It helps teams understand why an agent chose a particular action and spot misaligned goals",
+      "It reduces the agent's API cost automatically",
+      "It replaces the need for any monitoring dashboard",
+      "It compresses log files for cheaper storage"
+      ],
+      "answer": "It helps teams understand why an agent chose a particular action and spot misaligned goals"
+      },
+      {
+      "id": 19,
+      "type": "fill_in_the_blanks",
+      "question": "The deck's basic RL traceability model logs each tuple of state, action, and ________ to support full traceability.",
+      "answer": "Reward"
+      },
+      {
+      "id": 20,
+      "type": "matching_pairs",
+      "question": "Match each monitoring metric category from the deck to an example metric it includes.",
+      "pairs": [
+      { "left": "Behavioral Metrics", "right": "Policy deviation frequency — how often the agent strays from its plan" },
+      { "left": "Performance Metrics", "right": "Response latency — end-to-end delay of the agent's reply" },
+      { "left": "Safety Metrics", "right": "Rule violations — alerts triggered by misaligned or unsafe actions" }
+      ]
+      },
+      {
+      "id": 21,
+      "type": "multiple_choice",
+      "question": "Which tool does the deck describe as specialized for LLM agent traces and evaluations?",
+      "options": ["LangSmith / PromptLayer", "CloudWatch", "ELK Stack", "Prometheus"],
+      "answer": "LangSmith / PromptLayer"
+      },
+      {
+      "id": 22,
+      "type": "multiple_choice",
+      "question": "What does the deck identify as an operational risk of triggering too many safety alerts?",
+      "options": ["Alert fatigue", "Reduced storage cost", "Faster agent responses", "Improved user privacy"],
+      "answer": "Alert fatigue"
+      },
+      {
+      "id": 23,
+      "type": "dropdown_inline",
+      "question": "The deck lists {dropdown_options} as a Safety Metric, alongside rule violations and unsafe content triggers, for monitoring AI agents.",
+      "dropdown_options": ["Tool misuse detection", "Response latency", "Session ID logging"],
+      "answer": "Tool misuse detection"
+      },
+      {
+      "id": 24,
+      "type": "fill_in_the_blanks",
+      "question": "Detecting an AI agent that repeats the same failed step, or fabricates an answer, falls under 'looping or ________ detection' in the deck's Behavioral Metrics.",
+      "answer": "Hallucination"
+      },
+      {
+      "id": 25,
+      "type": "true_false",
+      "question": "According to the deck, one of the ethical and privacy challenges of agent logging is that over-logging can create surveillance risks and unintended profiling.",
+      "answer": "True",
+      "explanation": "The deck lists 'over-logging leading to surveillance risks' as an ethical and privacy issue, alongside sensitive user data exposure in contextual logs."
+      },
+      {
+      "id": 26,
+      "type": "fill_in_the_blanks",
+      "question": "Among the deck's Agent-Specific Platforms, ________ logs are named for multi-agent collaboration debugging.",
+      "answer": "AutoGen"
+      },
+      {
+      "id": 27,
+      "type": "multiple_choice",
+      "question": "Which of these is listed as a Best Practice in the deck's conclusion section?",
+      "options": [
+      "Log decisions, not just outputs, to capture the full action-reason chain",
+      "Store all logs indefinitely regardless of sensitivity",
+      "Disable monitoring during peak traffic to save cost",
+      "Avoid structured formats so logs stay human-only readable"
+      ],
+      "answer": "Log decisions, not just outputs, to capture the full action-reason chain"
+      },
+      {
+      "id": 28,
+      "type": "multiple_choice",
+      "question": "The deck's best practices recommend using structured, queryable logs — for example JSON — primarily to support integration with which tool?",
+      "options": ["ELK Stack", "CrewAI", "LangSmith", "Azure Monitor"],
+      "answer": "ELK Stack"
+      },
+      {
+      "id": 29,
+      "type": "true_false",
+      "question": "The deck states that anomaly detection and alerting for AI systems is a capability specifically highlighted for Datadog.",
+      "answer": "True",
+      "explanation": "The deck lists Datadog under Monitoring & Alerting, describing it as providing anomaly detection and alerting for AI systems."
+      },
+      {
+      "id": 30,
+      "type": "dropdown_inline",
+      "question": "Per the deck's conclusion, logging ensures {dropdown_options}, while monitoring ensures control through proactive anomaly detection.",
+      "dropdown_options": ["Accountability", "Higher latency", "Lower cost", "Faster inference"],
+      "answer": "Accountability"
+      }
+    ];
+
+    // ---- config for the open-ended "interactive_*" concept questions ----
+    const SPECIAL = {
+      10: {
+        items: ['Metrics are visualized on a real-time dashboard', 'The decision-level log is captured', 'Logs are aggregated and indexed', 'Anomaly detection tooling flags a deviation', 'The alert is routed for human review'],
+        correctOrder: ['The decision-level log is captured','Logs are aggregated and indexed','Metrics are visualized on a real-time dashboard','Anomaly detection tooling flags a deviation','The alert is routed for human review'],
+        check(order){ return order && order.join('~') === this.correctOrder.join('~'); }
+      },
+      14: {
+        pairs: [
+          { left: 'OpenTelemetry', right: 'Logging Tools — distributed tracing of agent decisions' },
+          { left: 'ELK Stack', right: 'Logging Tools — aggregates logs for search and visualization' },
+          { left: 'Prometheus + Grafana', right: 'Monitoring & Alerting — time-series metrics for real-time dashboards' },
+          { left: 'LangChain tracing', right: 'Agent-Specific Platforms — end-to-end visibility in prompt-to-action flows' }
+        ]
+      }
+    };
+
+    const TYPE_LABELS = {
+      multiple_choice: 'Multiple choice',
+      true_false: 'True or false',
+      fill_in_the_blanks: 'Fill in the blank',
+      dropdown_inline: 'Complete the passage',
+      sequencing: 'Put in order',
+      categorization: 'Sort into categories',
+      matching_pairs: 'Match the pairs',
+      image_hotspot: 'Click the diagram',
+      interactive_drag_and_drop: 'Arrange the flow',
+      interactive_slider: 'Run the simulation',
+      interactive_flowchart: 'Build the loop',
+      interactive_text_selection: 'Spot the error',
+      interactive_matching: 'Match the pairs'
+    };
+    const ARCH_LABELS = { gan:'Decision & System Logs', vae:'Tools & Metrics', diffusion:'Monitoring & Safety Signals', autoregressive:'Traceability & Best Practices' };
+
+    // simple line-icon set (one glyph per question type), drawn with currentColor
+    const ICONS = {
+      multiple_choice: '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9"/>',
+      true_false: '<rect x="3" y="8" width="18" height="8" rx="4"/><circle cx="8" cy="12" r="2.6"/>',
+      fill_in_the_blanks: '<path d="M4 18h16"/><path d="M8 6v9"/><path d="M8 6h4"/>',
+      dropdown_inline: '<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8.5 10.5L12 14l3.5-3.5"/>',
+      sequencing: '<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.3"/><circle cx="4.5" cy="12" r="1.3"/><circle cx="4.5" cy="18" r="1.3"/>',
+      categorization: '<path d="M3 7.5h6.5l2 2.2H21v10.3H3z"/>',
+      matching_pairs: '<circle cx="7" cy="12" r="3"/><circle cx="17" cy="12" r="3"/><path d="M10 12h4"/>',
+      image_hotspot: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.2"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>',
+      interactive_drag_and_drop: '<path d="M4 12h16"/><path d="M8 8l-4 4 4 4M16 8l4 4-4 4"/>',
+      interactive_slider: '<path d="M3 7h8M15 7h6M3 17h4M11 17h10"/><circle cx="13" cy="7" r="2.2"/><circle cx="9" cy="17" r="2.2"/>',
+      interactive_flowchart: '<circle cx="6" cy="5" r="2.1"/><circle cx="6" cy="19" r="2.1"/><circle cx="18" cy="12" r="2.1"/><path d="M6 7.1V17M6 12h10"/>',
+      interactive_text_selection: '<path d="M4 6h16M4 12h11"/><rect x="4" y="15.5" width="9" height="3.5" rx="1"/>',
+      interactive_matching: '<path d="M4 7h5l4 10h7M4 17h5l1.5-3.5"/><path d="M15 7h4"/><path d="M17 5l2 2-2 2"/>'
+    };
+
+    let currentIndex = 0;
+    let userAnswers = {};
+    const visitedSet = new Set();   // every question that has been displayed
+    const touchedSet = new Set();   // has an in-progress draft answer
+    const savedSet = new Set();     // draft was committed via Save & Next / Save
+    const flaggedSet = new Set();   // marked for review
+
+    // ---------- filtering ----------
+    let activeFilter = null; // { type: 'topic'|'status', value: string }
+    const STATUS_LABELS = { unvisited:'Unvisited', skipped:'Skipped', answered:'Answered', flagged:'Marked for Revisit' };
+
+    function qtypeLabelForValue(value){
+      const t = Array.isArray(value) ? value[0] : value;
+      return TYPE_LABELS[t] || t;
+    }
+    function sameFilterValue(a, b){
+      if (Array.isArray(a) || Array.isArray(b)){
+        const arrA = Array.isArray(a) ? a : [a];
+        const arrB = Array.isArray(b) ? b : [b];
+        return arrA.length === arrB.length && arrA.every(x => arrB.includes(x));
+      }
+      return a === b;
+    }
+    function matchesFilter(i){
+      if (!activeFilter) return true;
+      if (activeFilter.type === 'topic') return getArchitecture(quizData[i]) === activeFilter.value;
+      if (activeFilter.type === 'qtype'){
+        const types = Array.isArray(activeFilter.value) ? activeFilter.value : [activeFilter.value];
+        return types.includes(quizData[i].type);
+      }
+      switch (activeFilter.value){
+        case 'answered': return savedSet.has(i);
+        case 'skipped': return visitedSet.has(i) && !savedSet.has(i);
+        case 'unvisited': return !visitedSet.has(i);
+        case 'flagged': return flaggedSet.has(i);
+        default: return true;
+      }
+    }
+    function filteredIndices(){
+      return quizData.map((_, i) => i).filter(matchesFilter);
+    }
+    function nextInFilter(afterIndex){
+      return filteredIndices().find(i => i > afterIndex);
+    }
+    function prevInFilter(beforeIndex){
+      const list = filteredIndices();
+      for (let k = list.length - 1; k >= 0; k--){ if (list[k] < beforeIndex) return list[k]; }
+      return undefined;
+    }
+    function setFilter(type, value){
+      const turningOff = activeFilter && activeFilter.type === type && sameFilterValue(activeFilter.value, value);
+      const prevIndex = currentIndex;
+      if (turningOff){
+        activeFilter = null;
+      } else {
+        activeFilter = { type, value };
+        const list = filteredIndices();
+        if (list.length){
+          const unanswered = list.find(i => !savedSet.has(i));
+          currentIndex = unanswered !== undefined ? unanswered : list[0];
+        }
+      }
+      if (currentIndex !== prevIndex) renderQuestion();
+      else updateProgress();
+    }
+    function renderFilterBanner(){
+      const banner = document.getElementById('filter-banner');
+      if (!activeFilter){ banner.hidden = true; return; }
+      const count = filteredIndices().length;
+      const label = activeFilter.type === 'topic' ? ARCH_LABELS[activeFilter.value]
+        : activeFilter.type === 'qtype' ? qtypeLabelForValue(activeFilter.value)
+        : STATUS_LABELS[activeFilter.value];
+      banner.hidden = false;
+      document.getElementById('filter-banner-text').innerHTML = 'Filtering: <strong>' + label + '</strong> · ' + count + (count === 1 ? ' question' : ' questions');
+    }
+    function updateNavButtons(){
+      const isLast = currentIndex === quizData.length - 1;
+      const prevBtn = document.getElementById('prev-btn');
+      const nextBtn = document.getElementById('next-btn');
+      if (activeFilter){
+        prevBtn.disabled = prevInFilter(currentIndex) === undefined;
+        nextBtn.disabled = nextInFilter(currentIndex) === undefined;
+      } else {
+        prevBtn.disabled = currentIndex === 0;
+        nextBtn.disabled = false;
+      }
+      nextBtn.style.display = isLast ? 'none' : 'inline-flex';
+      document.getElementById('save-next-btn').style.display = isLast ? 'none' : 'inline-flex';
+      document.getElementById('submit-btn').style.display = isLast ? 'inline-flex' : 'none';
+    }
+    function updateFlagButton(){
+      const btn = document.getElementById('flag-btn');
+      const active = flaggedSet.has(currentIndex);
+      btn.classList.toggle('active', active);
+      btn.querySelector('span').textContent = active ? 'Marked for Revisit' : 'Mark for Revisit';
+    }
+
+    function cleanText(s){ return (s || '').replace(/\[cite:\s*\d+\]/g, '').trim(); }
+
+    function getArchitecture(q){
+      const t = (q.question + ' ' + (q.options||[]).join(' ') + ' ' + (q.interactiveConcept||'')).toLowerCase();
+      if (/(decision-level|system-level|contextual log|structured log|log categor)/.test(t)) return 'gan';
+      if (/(opentelemetry|elk stack|langsmith|promptlayer|prometheus|grafana|datadog|cloudwatch|azure monitor|langchain tracing|autogen|crewai|agent-specific platform|latency|throughput|distributed trac)/.test(t)) return 'vae';
+      if (/(anomaly|hallucination|policy deviation|rule violation|unsafe content|tool misuse|alert fatigue|behavioral metric|safety metric|looping)/.test(t)) return 'diffusion';
+      return 'autoregressive';
+    }
+
+    function shuffle(arr){
+      const a = arr.slice();
+      for (let i = a.length - 1; i > 0; i--){
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function markTouched(idx){
+      touchedSet.add(idx);
+      updateProgress();
+    }
+
+    function saveCurrent(){
+      if (touchedSet.has(currentIndex)) savedSet.add(currentIndex);
+      updateProgress();
+    }
+
+    function saveAndNext(){
+      const prevIdx = currentIndex;
+      saveCurrent();
+      if (activeFilter){
+        const nxt = nextInFilter(prevIdx);
+        if (nxt !== undefined){ currentIndex = nxt; renderQuestion(); }
+      } else if (currentIndex < quizData.length - 1){
+        changeQuestion(1);
+      }
+    }
+
+    // ---------- renderers ----------
+    function renderChoices(options, idx, body){
+      const list = document.createElement('div');
+      list.className = 'mc-list';
+      function refresh(){
+        Array.from(list.children).forEach(label => {
+          label.classList.toggle('selected', label.querySelector('input').checked);
+        });
+      }
+      options.forEach(opt => {
+        const label = document.createElement('label');
+        label.className = 'option-label';
+        const input = document.createElement('input');
+        input.type = 'radio';
+        input.name = 'q' + idx;
+        input.checked = userAnswers[idx] === opt;
+        input.addEventListener('change', () => {
+          userAnswers[idx] = opt;
+          markTouched(idx);
+          refresh();
+        });
+        const span = document.createElement('span');
+        span.textContent = opt;
+        label.appendChild(input);
+        label.appendChild(span);
+        list.appendChild(label);
+      });
+      refresh();
+      body.appendChild(list);
+    }
+
+    function renderFillBlank(q, idx, body){
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'text-input';
+      input.placeholder = 'Type your answer…';
+      input.value = userAnswers[idx] || '';
+      input.addEventListener('input', () => {
+        userAnswers[idx] = input.value;
+        markTouched(idx);
+      });
+      body.appendChild(input);
+    }
+
+    function renderDropdownInline(q, idx, body){
+      const p = document.createElement('p');
+      p.className = 'inline-question';
+      const text = cleanText(q.question);
+      const parts = text.split(/(\{dropdown_options_2\}|\{dropdown_options\})/);
+      let blankIndex = 0;
+      const saved = userAnswers[idx] || [];
+      parts.forEach(part => {
+        if (part === '{dropdown_options}' || part === '{dropdown_options_2}'){
+          const opts = part === '{dropdown_options_2}' ? q.dropdown_options_2 : q.dropdown_options;
+          const bIdx = blankIndex++;
+          const select = document.createElement('select');
+          select.className = 'inline-select';
+          const blankOpt = document.createElement('option');
+          blankOpt.value = '';
+          blankOpt.textContent = 'choose…';
+          select.appendChild(blankOpt);
+          opts.forEach(o => {
+            const opt = document.createElement('option');
+            opt.value = o;
+            opt.textContent = o;
+            if (saved[bIdx] === o) opt.selected = true;
+            select.appendChild(opt);
+          });
+          select.addEventListener('change', () => {
+            const arr = userAnswers[idx] || [];
+            arr[bIdx] = select.value;
+            userAnswers[idx] = arr;
+            markTouched(idx);
+          });
+          p.appendChild(select);
+        } else if (part) {
+          p.appendChild(document.createTextNode(part));
+        }
+      });
+      body.appendChild(p);
+    }
+
+    function seqArrowSVG(){
+      return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15M14 6l6 6-6 6"/></svg>';
+    }
+
+    function renderOrderedList(idx, initialItems, body){
+      if (!userAnswers[idx]) userAnswers[idx] = shuffle(initialItems);
+      const items = userAnswers[idx];
+
+      const hint = document.createElement('p');
+      hint.className = 'seq-hint';
+      hint.textContent = 'Drag the blocks into the correct order — the arrows show the sequence.';
+      body.appendChild(hint);
+
+      const wrap = document.createElement('div');
+      wrap.className = 'seq-flow';
+      body.appendChild(wrap);
+
+      let draggedText = null;
+      let ghost = null;
+
+      function draw(){
+        wrap.innerHTML = '';
+        items.forEach((text, i) => {
+          const block = document.createElement('div');
+          block.className = 'seq-block';
+          if (text === draggedText) block.classList.add('seq-block-hidden');
+          block.dataset.text = text;
+          block.innerHTML = '<span class="seq-num">' + (i + 1) + '</span><span class="seq-text"></span><span class="seq-handle">⠿</span>';
+          block.querySelector('.seq-text').textContent = text;
+          block.addEventListener('pointerdown', onPointerDown);
+          wrap.appendChild(block);
+          if (i < items.length - 1){
+            const arrow = document.createElement('span');
+            arrow.className = 'seq-arrow';
+            arrow.innerHTML = seqArrowSVG();
+            wrap.appendChild(arrow);
+          }
+        });
+      }
+
+      function onPointerDown(e){
+        e.preventDefault();
+        const block = e.currentTarget;
+        draggedText = block.dataset.text;
+        const rect = block.getBoundingClientRect();
+        ghost = block.cloneNode(true);
+        ghost.classList.add('seq-block-ghost');
+        ghost.classList.remove('seq-block-hidden');
+        ghost.style.width = rect.width + 'px';
+        ghost.style.left = rect.left + 'px';
+        ghost.style.top = rect.top + 'px';
+        ghost.dataset.offsetX = e.clientX - rect.left;
+        ghost.dataset.offsetY = e.clientY - rect.top;
+        document.body.appendChild(ghost);
+        draw();
+        window.addEventListener('pointermove', onPointerMove);
+        window.addEventListener('pointerup', onPointerUp);
+      }
+
+      function onPointerMove(e){
+        if (!ghost) return;
+        ghost.style.left = (e.clientX - parseFloat(ghost.dataset.offsetX)) + 'px';
+        ghost.style.top = (e.clientY - parseFloat(ghost.dataset.offsetY)) + 'px';
+
+        const blocks = Array.from(wrap.querySelectorAll('.seq-block:not(.seq-block-hidden)'));
+        for (const b of blocks){
+          const r = b.getBoundingClientRect();
+          if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom){
+            const targetText = b.dataset.text;
+            const from = items.indexOf(draggedText);
+            const to = items.indexOf(targetText);
+            if (from !== -1 && to !== -1 && from !== to){
+              items.splice(from, 1);
+              items.splice(to, 0, draggedText);
+              userAnswers[idx] = items;
+              markTouched(idx);
+              draw();
+            }
+            break;
+          }
+        }
+      }
+
+      function onPointerUp(){
+        window.removeEventListener('pointermove', onPointerMove);
+        window.removeEventListener('pointerup', onPointerUp);
+        if (ghost){ ghost.remove(); ghost = null; }
+        draggedText = null;
+        draw();
+      }
+
+      draw();
+    }
+
+    function renderCategorization(q, idx, body){
+      const state = userAnswers[idx] || {};
+      userAnswers[idx] = state;
+      const list = document.createElement('div');
+      list.className = 'cat-list';
+      q.items.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'cat-row';
+        const label = document.createElement('span');
+        label.className = 'cat-item-text';
+        label.textContent = item.text;
+        const select = document.createElement('select');
+        select.className = 'cat-select';
+        const blank = document.createElement('option');
+        blank.value = '';
+        blank.textContent = 'assign to…';
+        select.appendChild(blank);
+        q.categories.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c;
+          opt.textContent = c;
+          if (state[item.text] === c) opt.selected = true;
+          select.appendChild(opt);
+        });
+        select.addEventListener('change', () => {
+          state[item.text] = select.value;
+          markTouched(idx);
+        });
+        row.appendChild(label);
+        row.appendChild(select);
+        list.appendChild(row);
+      });
+      body.appendChild(list);
+    }
+
+    function matchArrowSVG(){
+      return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h13M12 6l6 6-6 6"/></svg>';
+    }
+
+    function renderMatching(pairs, idx, body){
+      const state = userAnswers[idx] || {};
+      userAnswers[idx] = state;
+      const rightOptions = shuffle(pairs.map(p => p.right));
+
+      const hint = document.createElement('p');
+      hint.className = 'match-hint';
+      hint.textContent = 'Drag each item below to connect it with its match on the left.';
+      body.appendChild(hint);
+
+      const board = document.createElement('div');
+      board.className = 'match-board';
+      body.appendChild(board);
+
+      const rowsWrap = document.createElement('div');
+      rowsWrap.className = 'match-rows';
+      board.appendChild(rowsWrap);
+
+      const pool = document.createElement('div');
+      pool.className = 'match-pool';
+      board.appendChild(pool);
+
+      let dragText = null;
+      let ghost = null;
+
+      function unmatchedRight(){
+        const used = new Set(Object.values(state).filter(Boolean));
+        return rightOptions.filter(r => !used.has(r));
+      }
+
+      function makeChip(text){
+        const chip = document.createElement('div');
+        chip.className = 'match-chip';
+        chip.dataset.text = text;
+        chip.textContent = text;
+        chip.addEventListener('pointerdown', onPointerDown);
+        return chip;
+      }
+
+      function draw(){
+        rowsWrap.innerHTML = '';
+        pairs.forEach(pair => {
+          const row = document.createElement('div');
+          row.className = 'match-row2';
+          row.dataset.left = pair.left;
+
+          const leftBlock = document.createElement('div');
+          leftBlock.className = 'match-block match-block-left';
+          leftBlock.textContent = pair.left;
+
+          const arrow = document.createElement('span');
+          arrow.className = 'match-arrow';
+          arrow.innerHTML = matchArrowSVG();
+
+          const slot = document.createElement('div');
+          slot.className = 'match-slot';
+          slot.dataset.left = pair.left;
+          const filled = state[pair.left];
+          if (filled && filled !== dragText){
+            slot.classList.add('filled');
+            slot.appendChild(makeChip(filled));
+          } else {
+            slot.classList.add('empty');
+            slot.textContent = 'Drop match here';
+          }
+
+          row.appendChild(leftBlock);
+          row.appendChild(arrow);
+          row.appendChild(slot);
+          rowsWrap.appendChild(row);
+        });
+
+        pool.innerHTML = '';
+        const remaining = unmatchedRight().filter(r => r !== dragText);
+        pool.classList.toggle('match-pool-empty', remaining.length === 0);
+        remaining.forEach(text => pool.appendChild(makeChip(text)));
+      }
+
+      function onPointerDown(e){
+        e.preventDefault();
+        const chip = e.currentTarget;
+        dragText = chip.dataset.text;
+        const rect = chip.getBoundingClientRect();
+
+        // free up the slot this chip currently occupies, if any
+        Object.keys(state).forEach(k => { if (state[k] === dragText) delete state[k]; });
+
+        ghost = document.createElement('div');
+        ghost.className = 'match-chip match-chip-ghost';
+        ghost.textContent = dragText;
+        ghost.style.width = rect.width + 'px';
+        ghost.style.left = rect.left + 'px';
+        ghost.style.top = rect.top + 'px';
+        ghost.dataset.offsetX = e.clientX - rect.left;
+        ghost.dataset.offsetY = e.clientY - rect.top;
+        document.body.appendChild(ghost);
+
+        draw();
+        window.addEventListener('pointermove', onPointerMove);
+        window.addEventListener('pointerup', onPointerUp);
+      }
+
+      function onPointerMove(e){
+        if (!ghost) return;
+        ghost.style.left = (e.clientX - parseFloat(ghost.dataset.offsetX)) + 'px';
+        ghost.style.top = (e.clientY - parseFloat(ghost.dataset.offsetY)) + 'px';
+
+        rowsWrap.querySelectorAll('.match-slot').forEach(s => s.classList.remove('drop-hover'));
+        const el = document.elementFromPoint(e.clientX, e.clientY);
+        const slot = el && el.closest && el.closest('.match-slot');
+        if (slot) slot.classList.add('drop-hover');
+      }
+
+      function onPointerUp(e){
+        window.removeEventListener('pointermove', onPointerMove);
+        window.removeEventListener('pointerup', onPointerUp);
+        const el = document.elementFromPoint(e.clientX, e.clientY);
+        const slot = el && el.closest && el.closest('.match-slot');
+        if (slot){
+          state[slot.dataset.left] = dragText;
+          markTouched(idx);
+        }
+        if (ghost){ ghost.remove(); ghost = null; }
+        dragText = null;
+        draw();
+      }
+
+      rowsWrap.addEventListener('click', (e) => {
+        const chip = e.target.closest('.match-slot.filled .match-chip');
+        if (!chip) return;
+        const row = chip.closest('.match-row2');
+        delete state[row.dataset.left];
+        markTouched(idx);
+        draw();
+      });
+
+      draw();
+    }
+
+    function renderSlider(q, idx, body){
+      const wrap = document.createElement('div');
+      wrap.className = 'slider-wrap';
+      const visual = document.createElement('div');
+      visual.className = 'slider-visual';
+      visual.textContent = '🌸';
+      const range = document.createElement('input');
+      range.type = 'range';
+      range.min = 0;
+      range.max = 100;
+      range.value = userAnswers[idx] !== undefined ? userAnswers[idx] : 0;
+      const labelRow = document.createElement('div');
+      labelRow.className = 'slider-labels';
+      const l1 = document.createElement('span');
+      l1.textContent = 't = 0 · clear image';
+      const l2 = document.createElement('span');
+      l2.textContent = 't = T · pure noise';
+      labelRow.appendChild(l1);
+      labelRow.appendChild(l2);
+      function update(v){
+        visual.style.filter = 'blur(' + (v/8) + 'px) grayscale(' + v + '%)';
+        visual.style.opacity = 1 - (v/140);
+      }
+      update(range.value);
+      range.addEventListener('input', () => {
+        userAnswers[idx] = Number(range.value);
+        update(range.value);
+        markTouched(idx);
+      });
+      wrap.appendChild(visual);
+      wrap.appendChild(range);
+      wrap.appendChild(labelRow);
+      body.appendChild(wrap);
+    }
+
+    function renderTextSelection(q, idx, body){
+      const sentences = SPECIAL[q.id].sentences;
+      const p = document.createElement('div');
+      p.className = 'selectable-passage';
+      sentences.forEach((s, i) => {
+        const span = document.createElement('span');
+        span.className = 'sel-sentence';
+        span.textContent = s + ' ';
+        if (userAnswers[idx] === i) span.classList.add('selected-sentence');
+        span.addEventListener('click', () => {
+          userAnswers[idx] = i;
+          markTouched(idx);
+          p.querySelectorAll('.sel-sentence').forEach(el => el.classList.remove('selected-sentence'));
+          span.classList.add('selected-sentence');
+        });
+        p.appendChild(span);
+      });
+      body.appendChild(p);
+    }
+
+    function renderHotspot(q, idx, body){
+      const cfg = SPECIAL[q.id];
+      const svgNS = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(svgNS, 'svg');
+      svg.setAttribute('viewBox', '0 0 480 200');
+      svg.classList.add('hotspot-diagram');
+      const zones = cfg.kind === 'gan'
+        ? [
+            { id:'realdata', x:20, y:15, w:110, h:44, label:'Real Data' },
+            { id:'noise', x:20, y:135, w:110, h:44, label:'Noise z' },
+            { id:'generator', x:170, y:135, w:120, h:44, label:'Generator' },
+            { id:'discriminator', x:330, y:70, w:130, h:70, label:'Discriminator' }
+          ]
+        : [
+            { id:'input', x:10, y:78, w:80, h:44, label:'Input x' },
+            { id:'encoder', x:110, y:78, w:90, h:44, label:'Encoder' },
+            { id:'latent', x:220, y:65, w:90, h:70, label:'Latent z' },
+            { id:'decoder', x:330, y:78, w:90, h:44, label:'Decoder' }
+          ];
+      zones.forEach(z => {
+        const g = document.createElementNS(svgNS, 'g');
+        g.classList.add('hotspot-zone');
+        if (userAnswers[idx] === z.id) g.classList.add('zone-selected');
+        const rect = document.createElementNS(svgNS, 'rect');
+        rect.setAttribute('x', z.x);
+        rect.setAttribute('y', z.y);
+        rect.setAttribute('width', z.w);
+        rect.setAttribute('height', z.h);
+        rect.setAttribute('rx', 8);
+        const text = document.createElementNS(svgNS, 'text');
+        text.setAttribute('x', z.x + z.w/2);
+        text.setAttribute('y', z.y + z.h/2 + 4);
+        text.setAttribute('text-anchor', 'middle');
+        text.textContent = z.label;
+        g.appendChild(rect);
+        g.appendChild(text);
+        g.addEventListener('click', () => {
+          userAnswers[idx] = z.id;
+          markTouched(idx);
+          svg.querySelectorAll('.hotspot-zone').forEach(el => el.classList.remove('zone-selected'));
+          g.classList.add('zone-selected');
+        });
+        svg.appendChild(g);
+      });
+      body.appendChild(svg);
+      const hint = document.createElement('p');
+      hint.className = 'hotspot-hint';
+      hint.textContent = 'Click the component described above.';
+      body.appendChild(hint);
+    }
+
+    // ---------- main render ----------
+    function renderQuestion(){
+      visitedSet.add(currentIndex);
+      const q = quizData[currentIndex];
+      const arch = getArchitecture(q);
+      const tag = document.getElementById('arch-tag');
+      tag.textContent = ARCH_LABELS[arch];
+      tag.className = 'tag tag-' + arch;
+
+      const typeChip = document.getElementById('type-chip');
+      const iconGlyph = ICONS[q.type] || ICONS.multiple_choice;
+      typeChip.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + iconGlyph + '</svg><span>' + (TYPE_LABELS[q.type] || 'Question') + '</span>';
+
+      document.getElementById('question-index').textContent = (currentIndex + 1) + ' / ' + quizData.length;
+
+      const qArea = document.getElementById('question-area');
+      qArea.innerHTML = '';
+      const header = document.createElement('h2');
+      header.className = 'question-text';
+      header.textContent = q.type === 'dropdown_inline' ? 'Complete the passage' : cleanText(q.question);
+      qArea.appendChild(header);
+
+      const body = document.createElement('div');
+      body.className = 'answer-body';
+      qArea.appendChild(body);
+
+      switch (q.type){
+        case 'multiple_choice':
+          renderChoices(q.options, currentIndex, body);
+          break;
+        case 'true_false':
+          renderChoices(q.options || ['True', 'False'], currentIndex, body);
+          break;
+        case 'fill_in_the_blanks':
+          renderFillBlank(q, currentIndex, body);
+          break;
+        case 'dropdown_inline':
+          renderDropdownInline(q, currentIndex, body);
+          break;
+        case 'sequencing':
+          renderOrderedList(currentIndex, q.options, body);
+          break;
+        case 'categorization':
+          renderCategorization(q, currentIndex, body);
+          break;
+        case 'matching_pairs':
+          renderMatching(q.pairs, currentIndex, body);
+          break;
+        case 'image_hotspot':
+          renderHotspot(q, currentIndex, body);
+          break;
+        case 'interactive_drag_and_drop':
+        case 'interactive_flowchart':
+          renderOrderedList(currentIndex, SPECIAL[q.id].items, body);
+          break;
+        case 'interactive_slider':
+          renderSlider(q, currentIndex, body);
+          break;
+        case 'interactive_text_selection':
+          renderTextSelection(q, currentIndex, body);
+          break;
+        case 'interactive_matching':
+          renderMatching(SPECIAL[q.id].pairs, currentIndex, body);
+          break;
+        default:
+          renderFillBlank(q, currentIndex, body);
+      }
+
+      updateFlagButton();
+
+      // retrigger the entrance animation on question change
+      qArea.classList.remove('q-anim');
+      void qArea.offsetWidth;
+      qArea.classList.add('q-anim');
+
+      updateProgress();
+    }
+
+    // ---------- sidebar: legend + question navigator ----------
+    function buildSidebar(){
+      const legend = document.getElementById('legend');
+      legend.innerHTML = '';
+      Object.keys(ARCH_LABELS).forEach(arch => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'legend-chip';
+        chip.id = 'legend-chip-' + arch;
+        chip.dataset.arch = arch;
+        chip.title = 'Filter by ' + ARCH_LABELS[arch];
+        const dot = document.createElement('span');
+        dot.className = 'legend-dot';
+        dot.style.background = 'var(--' + arch + ')';
+        const name = document.createElement('span');
+        name.className = 'legend-name';
+        name.textContent = ARCH_LABELS[arch];
+        const count = document.createElement('span');
+        count.className = 'legend-count';
+        count.id = 'legend-count-' + arch;
+        chip.appendChild(dot);
+        chip.appendChild(name);
+        chip.appendChild(count);
+        chip.addEventListener('click', () => setFilter('topic', arch));
+        legend.appendChild(chip);
+      });
+
+      const nav = document.getElementById('navigator');
+      nav.innerHTML = '';
+      quizData.forEach((q, i) => {
+        const cell = document.createElement('button');
+        cell.type = 'button';
+        cell.className = 'nav-cell nav-arch-' + getArchitecture(q);
+        cell.textContent = i + 1;
+        cell.title = 'Question ' + (i + 1);
+        cell.addEventListener('click', () => { currentIndex = i; renderQuestion(); });
+        nav.appendChild(cell);
+      });
+
+      const qtypeToggle = document.getElementById('qtype-toggle');
+      const qtypeMenu = document.getElementById('qtype-menu');
+
+      function closeQtypeMenu(){ qtypeMenu.hidden = true; qtypeToggle.setAttribute('aria-expanded', 'false'); }
+      function openQtypeMenu(){ qtypeMenu.hidden = false; qtypeToggle.setAttribute('aria-expanded', 'true'); }
+
+      const allOpt = document.createElement('button');
+      allOpt.type = 'button';
+      allOpt.className = 'qtype-option';
+      allOpt.id = 'qtype-option-all';
+      allOpt.innerHTML = '<span>All types</span>';
+      allOpt.addEventListener('click', () => { activeFilter = null; closeQtypeMenu(); updateProgress(); });
+      qtypeMenu.appendChild(allOpt);
+
+      // group raw q.types that share the same display label (e.g. matching_pairs
+      // and interactive_matching both show as "Match the pairs") into one filter entry
+      const labelGroups = new Map(); // label -> Set(types)
+      quizData.forEach(q => {
+        const label = TYPE_LABELS[q.type] || q.type;
+        if (!labelGroups.has(label)) labelGroups.set(label, new Set());
+        labelGroups.get(label).add(q.type);
+      });
+      Array.from(labelGroups.entries()).forEach(([label, typeSet], gi) => {
+        const types = Array.from(typeSet);
+        const count = quizData.filter(q => types.includes(q.type)).length;
+        const opt = document.createElement('button');
+        opt.type = 'button';
+        opt.className = 'qtype-option';
+        opt.id = 'qtype-option-' + gi;
+        opt.dataset.types = types.join(',');
+        opt.innerHTML = '<span>' + label + '</span><span class="count">' + count + '</span>';
+        opt.addEventListener('click', () => { setFilter('qtype', types); closeQtypeMenu(); });
+        qtypeMenu.appendChild(opt);
+      });
+
+      qtypeToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (qtypeMenu.hidden) openQtypeMenu(); else closeQtypeMenu();
+      });
+      document.addEventListener('click', (e) => {
+        if (!qtypeMenu.hidden && !qtypeMenu.contains(e.target) && e.target !== qtypeToggle) closeQtypeMenu();
+      });
+
+      document.getElementById('stat-tile-unvisited').addEventListener('click', () => setFilter('status', 'unvisited'));
+      document.getElementById('stat-tile-skipped').addEventListener('click', () => setFilter('status', 'skipped'));
+      document.getElementById('stat-tile-answered').addEventListener('click', () => setFilter('status', 'answered'));
+      document.getElementById('stat-tile-flagged').addEventListener('click', () => setFilter('status', 'flagged'));
+      document.getElementById('filter-clear-btn').addEventListener('click', () => { activeFilter = null; updateProgress(); });
+
+      document.getElementById('flag-btn').addEventListener('click', () => {
+        if (flaggedSet.has(currentIndex)) flaggedSet.delete(currentIndex); else flaggedSet.add(currentIndex);
+        updateFlagButton();
+        updateProgress();
+      });
+    }
+
+    function updateProgress(){
+      Array.from(document.getElementById('navigator').children).forEach((cell, i) => {
+        const answered = savedSet.has(i);
+        const skipped = !answered && visitedSet.has(i);
+        cell.classList.toggle('answered', answered);
+        cell.classList.toggle('skipped', skipped);
+        cell.classList.toggle('current', i === currentIndex);
+        cell.classList.toggle('flagged', flaggedSet.has(i));
+        cell.classList.toggle('nav-hidden', !matchesFilter(i));
+      });
+
+      Object.keys(ARCH_LABELS).forEach(arch => {
+        const total = quizData.filter(q => getArchitecture(q) === arch).length;
+        const done = quizData.filter((q, i) => getArchitecture(q) === arch && savedSet.has(i)).length;
+        document.getElementById('legend-count-' + arch).textContent = done + '/' + total;
+        document.getElementById('legend-chip-' + arch).classList.toggle('chip-active', !!activeFilter && activeFilter.type === 'topic' && activeFilter.value === arch);
+      });
+
+      document.getElementById('stat-answered').textContent = savedSet.size;
+      document.getElementById('stat-skipped').textContent = visitedSet.size - savedSet.size;
+      document.getElementById('stat-unvisited').textContent = quizData.length - visitedSet.size;
+      document.getElementById('stat-flagged').textContent = flaggedSet.size;
+
+      ['unvisited', 'skipped', 'answered', 'flagged'].forEach(key => {
+        document.getElementById('stat-tile-' + key).classList.toggle(key === 'flagged' ? 'chip-active' : 'tile-active', !!activeFilter && activeFilter.type === 'status' && activeFilter.value === key);
+      });
+
+      const qtypeLabel = document.getElementById('qtype-toggle-label');
+      const isQtypeActive = !!activeFilter && activeFilter.type === 'qtype';
+      if (qtypeLabel) qtypeLabel.textContent = isQtypeActive ? qtypeLabelForValue(activeFilter.value) : 'All types';
+      document.querySelectorAll('.qtype-option').forEach(opt => {
+        const isAll = opt.id === 'qtype-option-all';
+        if (isAll){
+          opt.classList.toggle('qtype-option-active', !isQtypeActive);
+          return;
+        }
+        const types = (opt.dataset.types || '').split(',');
+        const active = isQtypeActive && sameFilterValue(activeFilter.value, types);
+        opt.classList.toggle('qtype-option-active', active);
+      });
+
+      const visibleCount = activeFilter ? filteredIndices().length : quizData.length;
+      document.getElementById('navigator').style.display = visibleCount ? 'grid' : 'none';
+      document.getElementById('navigator-empty').hidden = visibleCount !== 0;
+
+      renderFilterBanner();
+      updateNavButtons();
+    }
+
+    function changeQuestion(step){
+      if (activeFilter){
+        const target = step > 0 ? nextInFilter(currentIndex) : prevInFilter(currentIndex);
+        if (target === undefined) return;
+        currentIndex = target;
+      } else {
+        currentIndex += step;
+      }
+      renderQuestion();
+    }
+
+    // arrow-key navigation (ignored while typing in a field)
+    document.addEventListener('keydown', (e) => {
+      const tag = (e.target.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'select' || tag === 'textarea') return;
+      const nextBtn = document.getElementById('next-btn');
+      const prevBtn = document.getElementById('prev-btn');
+      if (e.key === 'ArrowRight' && nextBtn.style.display !== 'none' && !nextBtn.disabled){
+        changeQuestion(1);
+      } else if (e.key === 'ArrowLeft' && !prevBtn.disabled){
+        changeQuestion(-1);
+      } else if (e.key === 'Escape'){
+        const menu = document.getElementById('qtype-menu');
+        if (menu && !menu.hidden){
+          menu.hidden = true;
+          document.getElementById('qtype-toggle').setAttribute('aria-expanded', 'false');
+        }
+        if (activeFilter){
+          activeFilter = null;
+          updateProgress();
+        }
+      }
+    });
+
+    function checkCorrect(q, idx){
+      const ua = userAnswers[idx];
+      switch (q.type){
+        case 'multiple_choice':
+        case 'true_false':
+          return ua === q.answer;
+        case 'fill_in_the_blanks':
+          return (ua || '').toString().trim().toLowerCase() === q.answer.toString().trim().toLowerCase();
+        case 'dropdown_inline': {
+          const arr = ua || [];
+          if (Array.isArray(q.answer)) return q.answer.every((a, i) => (arr[i] || '').toLowerCase() === a.toLowerCase());
+          return (arr[0] || '').toLowerCase() === q.answer.toLowerCase();
+        }
+        case 'sequencing':
+          return JSON.stringify(ua) === JSON.stringify(q.answer);
+        case 'categorization':
+          return q.items.every(item => (ua || {})[item.text] === item.category);
+        case 'matching_pairs':
+          return q.pairs.every(p => (ua || {})[p.left] === p.right);
+        case 'image_hotspot':
+          return ua === SPECIAL[q.id].answerZone;
+        case 'interactive_drag_and_drop':
+        case 'interactive_flowchart':
+          return SPECIAL[q.id].check(ua || []);
+        case 'interactive_slider':
+          return (ua || 0) >= 90;
+        case 'interactive_text_selection':
+          return ua === SPECIAL[q.id].fabricatedIndex;
+        case 'interactive_matching':
+          return SPECIAL[q.id].pairs.every(p => (ua || {})[p.left] === p.right);
+        default:
+          return false;
+      }
+    }
+
+    function submitQuiz(){
+      let score = 0;
+      const categoryStats = {
+        gan: { correct: 0, total: 0 },
+        vae: { correct: 0, total: 0 },
+        diffusion: { correct: 0, total: 0 },
+        autoregressive: { correct: 0, total: 0 }
+      };
+      quizData.forEach((q, i) => {
+        const arch = getArchitecture(q);
+        categoryStats[arch].total++;
+        if (checkCorrect(q, i)){
+          score++;
+          categoryStats[arch].correct++;
+        }
+      });
+      localStorage.setItem('quizScore', score);
+      localStorage.setItem('quizTotal', quizData.length);
+      localStorage.setItem('quizCategoryStats', JSON.stringify(categoryStats));
+      window.location.href = 'result.html';
+    }
+
+    function initNavPanelToggle(){
+      const panel = document.getElementById('nav-panel');
+      const btn = document.getElementById('nav-panel-toggle');
+      function setCollapsed(collapsed){
+        panel.classList.toggle('collapsed', collapsed);
+        btn.textContent = collapsed ? 'Show' : 'Hide';
+        try{ localStorage.setItem('navPanelCollapsed', collapsed ? '1' : '0'); }catch(e){}
+      }
+      let stored = false;
+      try{ stored = localStorage.getItem('navPanelCollapsed') === '1'; }catch(e){}
+      setCollapsed(stored);
+      btn.addEventListener('click', () => setCollapsed(!panel.classList.contains('collapsed')));
+    }
+
+    buildSidebar();
+    initNavPanelToggle();
+    renderQuestion();
+</script>
+<script>
+  /* ---------- theme toggle (shared logic, all pages) ---------- */
+  (function(){
+    var SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.2"></circle><path d="M12 2.5v2.4M12 19.1v2.4M4.4 4.4l1.7 1.7M17.9 17.9l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.4 19.6l1.7-1.7M17.9 6.1l1.7-1.7"></path></svg>';
+    var MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 14.5A8.5 8.5 0 1 1 9.5 3.5a7 7 0 0 0 11 11Z"></path></svg>';
+
+    function current(){ return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'; }
+
+    function paint(t){
+      var btn = document.getElementById('theme-toggle');
+      if(!btn) return;
+      btn.innerHTML = t === 'dark' ? SUN : MOON;
+      btn.setAttribute('aria-label', t === 'dark' ? 'Switch to light theme' : 'Switch to dark theme');
+    }
+
+    function setTheme(t){
+      document.documentElement.setAttribute('data-theme', t);
+      try{ localStorage.setItem('theme', t); }catch(e){}
+      paint(t);
+    }
+
+    window.addEventListener('DOMContentLoaded', function(){
+      paint(current());
+      var btn = document.getElementById('theme-toggle');
+      if(btn){ btn.addEventListener('click', function(){ setTheme(current() === 'dark' ? 'light' : 'dark'); }); }
+    });
+
+    /* keep in sync if the theme is changed on another tab/page */
+    window.addEventListener('storage', function(e){
+      if(e.key === 'theme' && e.newValue){ document.documentElement.setAttribute('data-theme', e.newValue); paint(e.newValue); }
+    });
+  })();
+</script>
+</body>
+</html>
